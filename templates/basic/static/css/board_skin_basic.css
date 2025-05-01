@@ -1,46 +1,191 @@
 @charset "utf-8";
 
 /* 게시판 목록: 리스트형 */
-.bo_list .list_table { margin:0 0 20px; }
+.bo_list { padding: 20px; }
+.bo_list .list_table { margin:0 0 20px; border-collapse: separate; border-spacing: 0 10px; }
 .bo_list .list_table .is_notice { background:var(--boNoticeBg) !important; border-bottom:1px solid #f8e6ee; }
 .bo_list .list_table .is_notice .table_subject a { font-weight:bold; }
 .bo_list .list_table .is_notice .table_wrid { font-weight:bold; color:#f9267f }
 
 @media (min-width:1101px) {
-    .bo_list .list_table { width:100%; border-collapse:collapse; border-spacing:0 5px; background:var(--contBg); border-top:var(--border); border-bottom:var(--border) }
-    .bo_list .list_table thead th { padding:20px 0; font-weight:normal; text-align:center; border-bottom:var(--border); height:40px; color: var(--fontColor); }
+    .bo_list .list_table { width:100%; background:var(--contBg); }
+    .bo_list .list_table thead th { padding:20px 0; font-weight:500; text-align:center; border-bottom:var(--border); height:40px; color: var(--fontColor); }
     .bo_list .list_table tfoot th,
     .bo_list .list_table tfoot td { padding:10px 0; border-top:1px solid #c1d1d5; border-bottom:1px solid #c1d1d5; background:#d7e0e2; text-align:center }
     .bo_list .list_table tbody th { padding:8px 0; border-bottom:1px solid #e8e8e8 }
-    .bo_list .list_table tbody tr { border-left:2px solid transparent }
-    .bo_list .list_table tbody tr:hover { border-left:2px solid var(--primaryColor) }
+    .bo_list .list_table tbody tr { border-left:2px solid transparent; transition: all 0.3s ease; border-radius: 8px; }
+    .bo_list .list_table tbody tr:hover { border-left:2px solid var(--primaryColor); box-shadow: var(--cardShadow); transform: translateY(-2px); }
     .bo_list .list_table tbody .even td { background:var(--evenTdBg) }
-    .bo_list .list_table td { color:var(--tdColor); padding:10px 5px; border-top:var(--border); border-bottom:var(--border); line-height:1.6rem; height:60px; word-break:break-all }
+    .bo_list .list_table td { color:var(--tdColor); padding:18px 15px; border-top:var(--border); border-bottom:var(--border); line-height:1.6rem; height:70px; word-break:break-all; }
     .bo_list .list_table tbody tr:hover td { background:var(--bovHover) }
-    .bo_list .list_table a:hover { text-decoration:underline }
+    .bo_list .list_table a:hover { text-decoration:none; color: var(--primaryColor); }
     .bo_list .list_table .table_check { width:40px; text-align:center; }
     .bo_list .list_table .table_wrid { width:40px; text-align:center; }
     .bo_list .list_table .table_category { width:100px; text-align:center; }
-    .bo_list .list_table .table_writer { width:100px; }
+    .bo_list .list_table .table_subject { font-size: 1.5rem; font-weight: 500; }
+    .bo_list .list_table .table_writer { width:120px; }
     .bo_list .list_table .table_hit { width: 80px; text-align:center; }
     .bo_list .list_table .table_good,
     .bo_list .list_table .table_nogood { width: 50px; text-align: center; }
-    .bo_list .list_table .table_datetime { width: 80px; text-align: center; }
+    .bo_list .list_table .table_datetime { width: 100px; text-align: center; }
     .bo_list .list_table .table_status { width: 80px; text-align: center; }
+    
+    /* 카테고리 스타일 개선 */
+    .bo_list .category_link {
+        display: inline-block;
+        padding: 6px 12px;
+        background: rgba(65, 88, 209, 0.1);
+        color: var(--primaryColor);
+        border-radius: 20px;
+        font-size: 1.2rem;
+        font-weight: 500;
+        margin-right: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .bo_list .category_link:hover {
+        background: rgba(65, 88, 209, 0.2);
+    }
+    
+    /* 댓글 수 스타일 개선 */
+    .bo_list .count_comment {
+        display: inline-block;
+        background: var(--primaryColor);
+        color: white;
+        font-size: 1.1rem;
+        height: 20px;
+        line-height: 20px;
+        padding: 0 8px;
+        border-radius: 10px;
+        font-weight: bold;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
 }
 
 @media (max-width:1100px) {
     .bo_list .list_table { display:block; }
     .bo_list .list_table thead { display:none; }
     .bo_list .list_table tbody { display:block; }
-    .bo_list .list_table tr { display:block; padding:10px; border-bottom: var(--border); }
+    .bo_list .list_table tr { display:block; padding:15px; border-bottom: var(--border); margin-bottom: 10px; border-radius: 8px; box-shadow: var(--cardShadow); transition: all 0.3s ease; }
+    .bo_list .list_table tr:hover { transform: translateY(-2px); }
     .bo_list .list_table td { display:inline-block; position: relative; line-height: 22px; vertical-align:middle; }
-    .bo_list .list_table .table_subject { display:block; margin:5px 0; font-size:1.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bo_list .list_table .table_subject { display:block; margin:8px 0; font-size:1.6rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bo_list .list_table .table_hit::before,
     .bo_list .list_table .table_good::before,
     .bo_list .list_table .table_nogood::before { display:inline-block; margin:0 3px; content:attr(data-label); }
     .bo_list .list_table .is_notice .table_check { display:none; }
+    
+    /* 모바일 카테고리 */
+    .bo_list .category_link {
+        display: inline-block;
+        padding: 4px 10px;
+        background: rgba(65, 88, 209, 0.1);
+        color: var(--primaryColor);
+        border-radius: 20px;
+        font-size: 1.2rem;
+        margin-right: 5px;
+    }
+    
+    /* 모바일 댓글 수 */
+    .bo_list .count_comment {
+        display: inline-block;
+        background: var(--primaryColor);
+        color: white;
+        font-size: 1.1rem;
+        height: 20px;
+        line-height: 20px;
+        padding: 0 8px;
+        border-radius: 10px;
+        font-weight: bold;
+        margin-left: 5px;
+    }
 }
 
-/* 게시판 읽기 커스터마이징 */
-#bo_basic_view #view_header { grid-template-columns: 50px 1fr 170px; }
+/* 게시판 읽기 개선 */
+#bo_basic_view #view_header { grid-template-columns: 50px 1fr 170px; padding: 20px 0; }
+#bo_basic_view #view_subject { font-size: 2.4rem; margin: 20px 0 30px; padding: 0; line-height: 1.4; word-break: break-all; color: var(--fontColor); font-weight: 600; }
+
+/* 게시글 내용 영역 개선 */
+#bo_basic_view #article_contents {
+    line-height: 1.8;
+    font-size: 1.5rem;
+    margin: 30px 0;
+    word-break: break-all;
+}
+
+/* 이미지 최적화 */
+#bo_basic_view #article_img img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+/* 게시판 목록 리스트 스타일 */
+.list_category {
+    display: flex;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.list_category ul {
+    display: flex;
+    gap: 10px;
+}
+
+.list_category li a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: var(--contBg);
+    border-radius: 20px;
+    color: var(--tdColor);
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid #eaeaea;
+}
+
+.list_category li a.active,
+.list_category li a:hover {
+    background: var(--primaryColor);
+    color: white;
+    border-color: var(--primaryColor);
+}
+
+/* 목록 헤더 개선 */
+.list_header {
+    margin-bottom: 20px !important;
+    padding: 10px 0;
+    border-bottom: 1px solid #eaeaea;
+}
+
+.list_header .total {
+    font-weight: 500;
+    color: var(--fontColor);
+}
+
+/* 글쓰기 버튼 등 개선 */
+.list_header ul li .btn_b01,
+.list_header ul li .btn_admin {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--primaryColor);
+    color: white;
+    margin-left: 8px;
+    transition: all 0.3s ease;
+}
+
+.list_header ul li .btn_b01:hover,
+.list_header ul li .btn_admin:hover {
+    background: #285981;
+    transform: translateY(-2px);
+}
+
+.list_header ul li .btn_b01 i,
+.list_header ul li .btn_admin i {
+    font-size: 1.6rem;
+}

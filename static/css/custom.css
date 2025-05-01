@@ -1,0 +1,8 @@
+/* 메인 페이지 헤드라인 배경 */
+.headline-section .custom-background,
+.headline-section .swiper.modern-swiper.custom-background {
+    background-image: url('/theme_static/bootstrap/img/gateway_image.jpg') !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-size: cover !important;
+} 

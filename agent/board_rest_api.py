@@ -45,7 +45,7 @@ def post_to_board(article_data: dict) -> bool:
         article = Article(
             wr_subject=article_data["title"],
             wr_content=article_data["content"],
-            ca_name="blockchain",  # ca_name 명시적 설정
+            ca_name=article_data["ca_name"],
         )
 
         # API 엔드포인트 설정

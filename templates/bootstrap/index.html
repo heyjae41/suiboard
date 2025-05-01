@@ -3,76 +3,80 @@
 {% block title %}{{ request.state.title }}{% endblock title %}
 
 {% block content %}
-    <div id="main-content-wrapper" class="w-100 d-flex flex-column flex-md-row">
-        <div id="container" class="main_photo mb-4 mb-md-0">
-          <div class="latest_top_wr pe-md-4">
-            {{ render_latest_posts(request, 'main_list2', 'notice', 4, 23)|safe }}
-          </div>
+    <div id="main-content-wrapper" class="w-100 d-flex flex-column">        
+        <!-- 헤드라인 섹션 - 크기를 줄이고 모던하게 디자인 -->
+        <div class="container">
+            <div class="headline-section rounded-4 overflow-hidden main-border mb-5">
+                {{ render_latest_posts(request, 'modern_slider', 'notice', 3, 23)|safe }}
+            </div>
         </div>
-        <div id="aside" class="main_aside">
 
-          <!-- 설문조사 -->
-          <div class="d-md-block d-none">
-            {% include "/bbs/poll.html" %}
-          </div>
+        <!-- 특집 콘텐츠 섹션 -->
+        <div class="container mb-5">
+            <div class="row">
+                <div class="col-md-8">
+                    <!-- 주요 콘텐츠 -->
+                    <div class="featured-content mb-4">
+                        <h2 class="section-title d-block m-0 py-3 ps-3 fs-4 main-font fw-bold border-start border-4 border-primary">인기 게시글</h2>
+                        <div class="card-bg rounded-3 p-3">
+                            {{ render_latest_posts(request, 'featured_list', 'free', 4, 23)|safe }}
+                        </div>
+                    </div>
 
-          <!-- 공지사항 -->
-          {{ render_latest_posts(request, 'main_notice', 'notice', 4, 23)|safe }}
+                    <!-- 갤러리 포스트 타일형 배열 -->
+                    <div class="gallery-section mb-4">
+                        <h2 class="section-title d-block m-0 py-3 ps-3 fs-4 main-font fw-bold border-start border-4 border-primary">갤러리</h2>
+                        <div class="card-bg rounded-3 p-3">
+                            {{ render_latest_posts(request, 'gallery_grid', 'gallery', 6, 23)|safe }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <!-- 사이드바 콘텐츠 -->
+                    <div class="sidebar-content">
+                        <!-- 공지사항 -->
+                        <div class="notice-section mb-4">
+                            <h2 class="section-title d-block m-0 py-3 ps-3 fs-4 main-font fw-bold border-start border-4 border-primary">공지사항</h2>
+                            <div class="card-bg rounded-3 p-3">
+                                {{ render_latest_posts(request, 'simple_list', 'notice', 5, 23)|safe }}
+                            </div>
+                        </div>
 
-          <!-- 방문자 수 집계 -->
-          <div class="d-md-block d-none">
-            {% include "/visit/basic.html" %}
-          </div>
+                        <!-- 질문과 답변 -->
+                        <div class="qa-section mb-4">
+                            <h2 class="section-title d-block m-0 py-3 ps-3 fs-4 main-font fw-bold border-start border-4 border-primary">질문과 답변</h2>
+                            <div class="card-bg rounded-3 p-3">
+                                {{ render_latest_posts(request, 'simple_list', 'qa', 5, 23)|safe }}
+                            </div>
+                        </div>
 
-          <script>
-            // aside/최신글 - 탭메뉴 기능
-            var tabItems = document.querySelectorAll('.aside_tab ul.tab_01 li');
+                        <!-- 설문조사 -->
+                        <div class="poll-section mb-4">
+                            {% include "/bbs/poll.html" %}
+                        </div>
 
-            tabItems.forEach(function (item) {
-              item.addEventListener('click', function () {
-                var asideTabId = this.getAttribute('data-tab');
-
-                // Remove 'current' class from all tab items and content elements
-                tabItems.forEach(function (tabItem) {
-                  tabItem.classList.remove('current');
-                });
-
-                var contentElements = document.querySelectorAll('.aside_tab .content01');
-                contentElements.forEach(function (contentElement) {
-                  contentElement.classList.remove('current');
-                });
-
-                // Add 'current' class to the clicked tab item and corresponding content element
-                this.classList.add('current');
-                document.getElementById(asideTabId).classList.add('current');
-              });
-            });
-          </script>
+                        <!-- 방문자 통계 -->
+                        <div class="visit-section">
+                            {% include "/visit/basic.html" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-    <div id="latest-posts-wrapper" class="w-100"><!--<div id="latest-posts-wrapper" class="w-100 d-none">-->
-      <h2 class="blind">최신글</h2>
-      <div class="row mb-4">
-          {{ render_latest_posts(request, 'pic_list', 'free', 4, 23)|safe }}
-          {{ render_latest_posts(request, 'pic_list', 'qa', 4, 23)|safe }}
-      </div>
-      <div class="mb-4">
-          {{ render_latest_posts(request, 'pic_block', 'gallery', 4, 23)|safe }}
-      </div>
-      <div class="row">
-          {% for board in boards %}
-          <div class="col-md-4">
-              {{ render_latest_posts(request, 'basic', board.bo_table, 6, 24)|safe }}
-          </div>
-          {% endfor %}
-      </div>
-      <!-- 설문조사 -->
-      <div class="d-md-none d-block">
-        {% include "/bbs/poll.html" %}
-      </div>
-      <!-- 방문자 수 집계 -->
-      <div class="d-md-none d-block">
-        {% include "/visit/basic.html" %}
-      </div>
+
+        <!-- 카테고리별 최신글 -->
+        <div class="container mb-5">
+            <div class="board-section">
+                <h2 class="section-title d-block m-0 py-3 ps-3 fs-4 main-font fw-bold border-start border-4 border-primary">카테고리별 최신글</h2>
+                <div class="row card-bg rounded-3 p-3 mx-0">
+                    {% for board in boards %}
+                    <div class="col-md-4">
+                        {{ render_latest_posts(request, 'category_list', board.bo_table, 6, 24)|safe }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock content %}

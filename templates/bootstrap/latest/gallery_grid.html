@@ -1,0 +1,58 @@
+{% if board.bo_use_sideview %}
+    {% import "/sideview/macros.html" as sideview %}
+{% endif %}
+
+{% set thumb_width, thumb_height = 300, 220 %}
+
+<div class="gallery-grid">
+    <div class="row g-3">
+        {% for write in writes -%}
+        <div class="col-md-4 col-sm-6">
+            <div class="gallery-item h-100 rounded-3 overflow-hidden shadow-sm position-relative">
+                <a href="{{ url_for('read_post', bo_table=bo_table, wr_id=write.wr_id) }}" class="d-block position-relative">
+                    {% set thumbnail=get_list_thumbnail(request, board, write, thumb_width, thumb_height) %}
+                    <div class="gallery-img" style="height: 180px;">
+                        {% if thumbnail.src %}
+                        <img src="/{{ thumbnail.src }}" alt="{{ thumbnail.alt }}" class="w-100 h-100 object-fit-cover">
+                        {% else %}
+                        <img src="{{ theme_asset(request, 'img/no_img.png') }}" alt="이미지가 없습니다." class="w-100 h-100 object-fit-cover">
+                        {% endif %}
+                    </div>
+                    
+                    <div class="gallery-info p-3">
+                        <h3 class="fs-6 mb-1 text-truncate">
+                            {% if write.is_notice %}<span class="badge bg-primary me-1">공지</span>{% endif %}
+                            {{ write.subject }}
+                            {% if write.icon_hot %}<span class="badge bg-danger ms-1">인기</span>{% endif %}
+                            {% if write.icon_new %}<span class="badge bg-success ms-1">NEW</span>{% endif %}
+                        </h3>
+                        
+                        <div class="d-flex align-items-center sub-font fs-6">
+                            <span class="me-2">
+                                {% if board.bo_use_sideview %}
+                                    {{ sideview.get(request, write.mb_id, write.name, write.wr_email, write.wr_homepage)|safe }}
+                                {% else %}
+                                    <span class="{% if write.mb_id %}member{% else %}guest{% endif %}">
+                                        {{ write.name }}
+                                    </span>
+                                {% endif %}
+                            </span>
+                            <span class="ms-auto">{{ write.datetime|truncate(10, True, '') }}</span>
+                        </div>
+                    </div>
+                </a>
+                
+                {% if write.wr_comment %}
+                <span class="position-absolute top-0 end-0 bg-dark bg-opacity-75 text-white px-2 py-1 m-2 rounded-pill">
+                    <i class="fa fa-regular fa-commenting" aria-hidden="true"></i> {{ write.wr_comment }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% else -%}
+        <div class="col-12">
+            <div class="py-5 text-center fs-5 sub-font">게시물이 없습니다.</div>
+        </div>
+        {%- endfor %}
+    </div>
+</div> 

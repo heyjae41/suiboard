@@ -1,0 +1,92 @@
+import requests
+from bs4 import BeautifulSoup
+import schedule
+import time
+from datetime import datetime
+from board_rest_api import post_to_board
+
+# 가장 최근 글 제목을 저장할 전역 변수
+latest_article_title = None
+
+
+def process_stock_news():
+
+    global latest_article_title
+
+    try:
+        # 네이버 증권 시황전망
+        url = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=401"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # 뉴스 기사 목록 추출
+        articles = soup.select("#contentarea_left > ul")
+        if not articles:
+            print("기사를 찾을 수 없습니다.")
+            return
+
+        # 모든 기사의 내용을 하나로 합치기
+        content = ""
+        for article_list in articles:
+            news_items = article_list.select("li")
+            for item in news_items:
+
+                # 기사 제목과 링크 추출
+                article_link = item.select_one(".articleSubject a")
+                title = article_link.text.strip()
+
+                # 첫 번째 기사인 경우 이전 스크래핑 결과와 비교
+                if news_items[0] == item:
+                    if latest_article_title and title == latest_article_title:
+                        print("새로운 기사가 없습니다.")
+                        return
+                if latest_article_title and title == latest_article_title:
+                    break
+                # 마지막 기사인 경우 다음 스크래핑을 위해 제목 저장
+                latest_article_title = title
+
+                link = "https://finance.naver.com" + article_link["href"]
+
+                # 기사 내용 추출
+                article_summary = item.select_one(".articleSummary")
+                summary = article_summary.text.strip() if article_summary else ""
+
+                # 기사 시간 추출
+                article_time = item.select_one(".wdate")
+                time_text = article_time.text.strip() if article_time else ""
+
+                # HTML 형식으로 기사 정보 추가
+                content += f"<h3><a href='{link}' target='_blank'>{title}</a></h3>\n"
+                content += f"<p>{summary}</p>\n"
+                content += f"<p><small>{time_text}</small></p>\n"
+                content += "<hr>\n"
+
+            if content:
+                # 현재 시간을 제목에 포함
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+                article_data = {
+                    "title": f"증권 시황 전망 ({current_time})",
+                    "content": content,
+                    "ca_name": "stock",
+                }
+                print(article_data)
+            # 게시판에 작성
+            if post_to_board(article_data):
+                print("게시글 작성 성공")
+            else:
+                print("게시글 작성 실패")
+
+    except Exception as e:
+        print(f"오류 발생: {str(e)}")
+
+
+# 1시간마다 실행
+schedule.every().hour.do(process_stock_news)
+
+# 프로그램 시작 시 즉시 한 번 실행
+process_stock_news()
+
+# 스케줄러 실행
+while True:
+    schedule.run_pending()
+    time.sleep(1)

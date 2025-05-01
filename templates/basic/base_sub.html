@@ -9,6 +9,10 @@
 {% endif -%}
 <title>{% block title %}{{ request.state.title }}{% endblock title %}</title>
 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<!-- Google Fonts - Noto Sans KR -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ theme_asset(request, 'css/default.css?ver=1.1.1') }}">
 <link rel="stylesheet" href="{{ theme_asset(request, 'js/slick/slick.css?ver=1.8.1') }}">
 <link rel="stylesheet" href="/static/js/font-awesome/css/all.min.css?ver=6.5.1">

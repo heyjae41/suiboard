@@ -1,0 +1,35 @@
+{% if board.bo_use_sideview %}
+    {% import "/sideview/macros.html" as sideview %}
+{% endif %}
+
+<div class="simple-list">
+    <ul class="list-unstyled m-0">
+        {% for write in writes -%}
+        <li class="border-bottom py-2">
+            <div class="d-flex align-items-center">
+                <h3 class="mb-0 fs-6 flex-grow-1 text-truncate">
+                    <a href="{{ url_for('read_post', bo_table=bo_table, wr_id=write.wr_id) }}" class="text-decoration-none">
+                        {% if write.is_notice %}<span class="badge bg-primary me-1">공지</span>{% endif %}
+                        {{ write.subject }}
+                    </a>
+                    {% if write.icon_hot %}<span class="badge bg-danger ms-1">인기</span>{% endif %}
+                    {% if write.icon_new %}<span class="badge bg-success ms-1">NEW</span>{% endif %}
+                    {% if write.wr_comment %}<span class="text-muted ms-1">[{{ write.wr_comment }}]</span>{% endif %}
+                </h3>
+            </div>
+            <div class="sub-font small mt-1">
+                {% if board.bo_use_sideview %}
+                    {{ sideview.get(request, write.mb_id, write.name, write.wr_email, write.wr_homepage)|safe }}
+                {% else %}
+                    <span class="{% if write.mb_id %}member{% else %}guest{% endif %}">
+                        {{ write.name }}
+                    </span>
+                {% endif %}
+                <span class="ms-1">{{ write.datetime|truncate(10, True, '') }}</span>
+            </div>
+        </li>
+        {% else -%}
+        <li class="py-4 text-center sub-font">게시물이 없습니다.</li>
+        {%- endfor %}
+    </ul>
+</div> 

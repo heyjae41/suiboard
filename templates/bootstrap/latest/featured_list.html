@@ -1,0 +1,58 @@
+{% if board.bo_use_sideview %}
+    {% import "/sideview/macros.html" as sideview %}
+{% endif %}
+
+{% set thumb_width, thumb_height = 120, 120 %}
+
+<div class="featured-posts">
+    <ul class="list-unstyled m-0"> 
+        {% for write in writes -%}
+        <li class="d-flex mb-3 py-2 border-bottom">
+            {% if write.icon_secret -%}
+                <i class="fa fa-lock" aria-hidden="true"></i>
+                <span class="blind">비밀글</span>
+            {%- endif -%}
+            
+            <div class="me-3">
+                <a href="{{ url_for('read_post', bo_table=bo_table, wr_id=write.wr_id) }}" class="d-block rounded-3 overflow-hidden" style="width: 80px; height: 80px;">
+                    {% set thumbnail=get_list_thumbnail(request, board, write, thumb_width, thumb_height) %}
+                    {% if thumbnail.src %}
+                    <img src="/{{ thumbnail.src }}" alt="{{ thumbnail.alt }}" class="w-100 h-100 object-fit-cover">
+                    {% else %}
+                    <img src="{{ theme_asset(request, 'img/no_img.png') }}" alt="이미지가 없습니다." class="w-100 h-100 object-fit-cover">
+                    {% endif %}
+                </a>
+            </div>
+            
+            <div class="flex-grow-1">
+                <h3 class="fs-5 mb-1">
+                    <a href="{{ url_for('read_post', bo_table=bo_table, wr_id=write.wr_id) }}" class="main-font text-decoration-none">
+                        {% if write.is_notice %}<span class="badge bg-primary me-1">공지</span>{% endif %}
+                        {{ write.subject }}
+                        {% if write.icon_hot %}<span class="badge bg-danger ms-1">인기</span>{% endif %}
+                        {% if write.icon_new %}<span class="badge bg-success ms-1">NEW</span>{% endif %}
+                    </a>
+                </h3>
+                
+                <p class="mb-1 text-truncate sub-font fs-6">{{ write.wr_content|striptags }}</p>
+                
+                <div class="d-flex align-items-center sub-font fs-6">
+                    <span class="me-2">
+                        {% if board.bo_use_sideview %}
+                            {{ sideview.get(request, write.mb_id, write.name, write.wr_email, write.wr_homepage)|safe }}
+                        {% else %}
+                            <span class="{% if write.mb_id %}member{% else %}guest{% endif %}">
+                                {{ write.name }}
+                            </span>
+                        {% endif %}
+                    </span>
+                    <span class="me-2">{{ write.datetime }}</span>
+                    {% if write.wr_comment %}<span class="me-2"><i class="fa fa-regular fa-commenting" aria-hidden="true"></i> {{ write.wr_comment }}</span>{% endif %}
+                </div>
+            </div>
+        </li>
+        {% else -%}
+            <li class="py-5 text-center fs-5 sub-font">게시물이 없습니다.</li>
+        {%- endfor %}
+    </ul>
+</div> 

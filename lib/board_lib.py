@@ -1,4 +1,5 @@
 """게시판/게시글 함수 모음"""
+
 import os
 import re
 from datetime import datetime, timedelta
@@ -16,15 +17,21 @@ from core.exception import AlertException
 from core.models import Board, BoardNew, Member, WriteBaseModel
 from core.template import TemplateService, UserTemplates
 from lib.common import (
-    FileCache, StringEncrypt, cut_name, dynamic_create_write_table, get_admin_email,
-    get_admin_email_name, get_editor_image, thumbnail
+    FileCache,
+    StringEncrypt,
+    cut_name,
+    dynamic_create_write_table,
+    get_admin_email,
+    get_admin_email_name,
+    get_editor_image,
+    thumbnail,
 )
 from lib.mail import mailer
 from lib.member import MemberDetails
 from service.board_file_service import BoardFileService as FileService
 
 
-class BoardConfig():
+class BoardConfig:
     """게시판 설정 정보를 담는 클래스."""
 
     def __init__(self, request: Request, board: Board) -> None:
@@ -43,7 +50,11 @@ class BoardConfig():
         Returns:
             int: 갤러리 이미지 가로 크기.
         """
-        return (self.board.bo_mobile_gallery_width if self.is_mobile else self.board.bo_gallery_width) or 200
+        return (
+            self.board.bo_mobile_gallery_width
+            if self.is_mobile
+            else self.board.bo_gallery_width
+        ) or 200
 
     @property
     def gallery_height(self) -> int:
@@ -52,7 +63,11 @@ class BoardConfig():
         Returns:
             int: 갤러리 이미지 세로 크기.
         """
-        return (self.board.bo_mobile_gallery_height if self.is_mobile else self.board.bo_gallery_height) or 150
+        return (
+            self.board.bo_mobile_gallery_height
+            if self.is_mobile
+            else self.board.bo_gallery_height
+        ) or 150
 
     @property
     def image_width(self) -> int:
@@ -71,8 +86,16 @@ class BoardConfig():
             int: 게시판 페이지당 출력할 행의 수.
         """
         # 모바일 여부 확인
-        bo_page_rows = self.board.bo_mobile_page_rows if self.is_mobile else self.board.bo_page_rows
-        page_rows = self.config.cf_mobile_page_rows if self.is_mobile else self.config.cf_page_rows
+        bo_page_rows = (
+            self.board.bo_mobile_page_rows
+            if self.is_mobile
+            else self.board.bo_page_rows
+        )
+        page_rows = (
+            self.config.cf_mobile_page_rows
+            if self.is_mobile
+            else self.config.cf_page_rows
+        )
 
         return bo_page_rows if bo_page_rows != 0 else page_rows
 
@@ -164,7 +187,11 @@ class BoardConfig():
         Returns:
             - str : 수정된 subject 문자열.
         """
-        cut_length = cut_length or (self.board.bo_mobile_subject_len if self.is_mobile else self.board.bo_subject_len)
+        cut_length = cut_length or (
+            self.board.bo_mobile_subject_len
+            if self.is_mobile
+            else self.board.bo_subject_len
+        )
 
         if not cut_length:
             return subject
@@ -177,8 +204,7 @@ class BoardConfig():
         Returns:
             list: 게시판 카테고리 목록.
         """
-        if (not self.board.bo_use_category
-                or self.board.bo_category_list == ""):
+        if not self.board.bo_use_category or self.board.bo_category_list == "":
             return []
 
         return self.board.bo_category_list.split("|")
@@ -209,8 +235,7 @@ class BoardConfig():
             db = DBConnect().sessionLocal()
 
             if self.board.bo_use_signature and mb_id:
-                member = db.scalar(
-                    select(Member).filter(Member.mb_id == mb_id))
+                member = db.scalar(select(Member).filter(Member.mb_id == mb_id))
 
                 return getattr(member, "mb_signature", "")
             else:
@@ -244,7 +269,11 @@ class BoardConfig():
                 sort_field = getattr(model, field_parts[0])
                 if not sort_field:
                     continue
-                sort_order = asc(sort_field) if len(field_parts) == 1 or field_parts[1].lower() == "asc" else desc(sort_field)
+                sort_order = (
+                    asc(sort_field)
+                    if len(field_parts) == 1 or field_parts[1].lower() == "asc"
+                    else desc(sort_field)
+                )
                 query = query.order_by(sort_order)
         else:
             query = query.order_by(model.wr_num, model.wr_reply)
@@ -309,7 +338,9 @@ class BoardConfig():
         """
         result = False
         if self.board.bo_new > 0:
-            result = reg_date > (datetime.now() - timedelta(hours=int(self.board.bo_new)))
+            result = reg_date > (
+                datetime.now() - timedelta(hours=int(self.board.bo_new))
+            )
 
         return result
 
@@ -373,7 +404,7 @@ class BoardConfig():
 
         Args:
             board (Board): 게시판 object
-            member (Member): 회원 object 
+            member (Member): 회원 object
 
         Returns:
             str: 이름 또는 닉네임
@@ -385,7 +416,10 @@ class BoardConfig():
         elif default_name:
             return default_name
         else:
-            raise AlertException("로그인 세션 만료, 비회원 글쓰기시 작성자 이름 미기재 등의 비정상적인 접근입니다.", 400)
+            raise AlertException(
+                "로그인 세션 만료, 비회원 글쓰기시 작성자 이름 미기재 등의 비정상적인 접근입니다.",
+                400,
+            )
 
     def _can_action_by_level(self, level: int) -> bool:
         """회원 레벨에 따라 행동 가능 여부를 판단한다.
@@ -419,10 +453,7 @@ class BoardConfig():
             comment_count = db.scalar(
                 select(func.count())
                 .select_from(write_model)
-                .where(
-                    write_model.wr_parent == wr_id,
-                    write_model.wr_is_comment == 1
-                )
+                .where(write_model.wr_parent == wr_id, write_model.wr_is_comment == 1)
             )
 
         if limit and limit <= comment_count:
@@ -445,10 +476,11 @@ class BoardConfig():
             return True
         # 게시글 작성자 or 게시글 작성자 IP와 현재 접속 IP가 같으면 통과
         if write:
-            if (is_owner(write, self.member.mb_id)
-                or (not self.member.mb_id
-                    and self.board.bo_read_level == 1
-                    and write.wr_ip == self.request.client.host)):
+            if is_owner(write, self.member.mb_id) or (
+                not self.member.mb_id
+                and self.board.bo_read_level == 1
+                and write.wr_ip == self.request.client.host
+            ):
                 return True
 
         return (member_point + point) >= 0
@@ -468,11 +500,12 @@ class BoardConfig():
 
 
 def write_search_filter(
-        model: WriteBaseModel,
-        category: str = None,
-        search_field: str = None,
-        keyword: str = None,
-        operator: str = "or") -> Select:
+    model: WriteBaseModel,
+    category: str = None,
+    search_field: str = None,
+    keyword: str = None,
+    operator: str = "or",
+) -> Select:
     """게시판 검색 필터를 적용합니다.
     - 그누보드5의 get_sql_search와 동일한 기능을 합니다.
 
@@ -513,8 +546,15 @@ def write_search_filter(
             for word in words:
                 if not word.strip():
                     continue
-                word_filters.append(or_(
-                    *[getattr(model, field).like(f"%{word}%") for field in fields if hasattr(model, field)]))
+                word_filters.append(
+                    or_(
+                        *[
+                            getattr(model, field).like(f"%{word}%")
+                            for field in fields
+                            if hasattr(model, field)
+                        ]
+                    )
+                )
 
         # 분리된 단어 별 검색필터에 or 또는 and를 적용
         if operator == "and":
@@ -547,7 +587,13 @@ def get_next_num(bo_table: str) -> int:
         db.close()
 
 
-def get_list(request: Request, db: Session, write: WriteBaseModel, board_config: BoardConfig, subject_len: int = 0):
+def get_list(
+    request: Request,
+    db: Session,
+    write: WriteBaseModel,
+    board_config: BoardConfig,
+    subject_len: int = 0,
+):
     """게시글 목록의 출력에 필요한 정보를 추가합니다.
     - 그누보드5의 get_list와 동일한 기능을 합니다.
 
@@ -581,7 +627,7 @@ def get_list(request: Request, db: Session, write: WriteBaseModel, board_config:
 # ex) 처음에는 정방향 A B C가 입력되고 역방향으로 바꾸면 last_reply_char이 A가 된다(Min).
 # 역방향의 char_end는 A이고 A - 1은 예외처리하고 있음으로 대댓글이 입력되지 않는다
 def generate_reply_character(board: Board, write):
-    """ 대댓글 단계 문자열 생성 
+    """대댓글 단계 문자열 생성
 
     Args:
         board (Board): 게시판 object
@@ -599,24 +645,20 @@ def generate_reply_character(board: Board, write):
     # 마지막 문자열 1개 자르기
     if not write.wr_is_comment:
         origin_reply = write.wr_reply
-        query = (
-            select(func.substr(write_model.wr_reply, -1).label("reply"))
-            .where(
-                write_model.wr_num == write.wr_num,
-                func.char_length(write_model.wr_reply) == (len(origin_reply) + 1)
-            )
+        query = select(func.substr(write_model.wr_reply, -1).label("reply")).where(
+            write_model.wr_num == write.wr_num,
+            func.char_length(write_model.wr_reply) == (len(origin_reply) + 1),
         )
         if origin_reply:
             query = query.where(write_model.wr_reply.like(f"{origin_reply}%"))
     else:
         origin_reply = write.wr_comment_reply
-        query = (
-            select(func.substr(write_model.wr_comment_reply, -1).label("reply"))
-            .where(
-                write_model.wr_parent == write.wr_parent,
-                write_model.wr_comment == write.wr_comment,
-                func.char_length(write_model.wr_comment_reply) == (len(origin_reply) + 1)
-            )
+        query = select(
+            func.substr(write_model.wr_comment_reply, -1).label("reply")
+        ).where(
+            write_model.wr_parent == write.wr_parent,
+            write_model.wr_comment == write.wr_comment,
+            func.char_length(write_model.wr_comment_reply) == (len(origin_reply) + 1),
         )
         if origin_reply:
             query = query.where(write_model.wr_comment_reply.like(f"{origin_reply}%"))
@@ -634,7 +676,9 @@ def generate_reply_character(board: Board, write):
         char_increase = -1
 
     if last_reply_char == char_end:  # A~Z은 26 입니다.
-        raise AlertException("더 이상 답변하실 수 없습니다. 답변은 26개 까지만 가능합니다.")
+        raise AlertException(
+            "더 이상 답변하실 수 없습니다. 답변은 26개 까지만 가능합니다."
+        )
 
     if not last_reply_char:
         reply_char = char_begin
@@ -647,7 +691,7 @@ def generate_reply_character(board: Board, write):
 
 
 def is_owner(mb_id_object: object, mb_id: str = None):
-    """ 게시글/댓글 작성자인지 확인한다.
+    """게시글/댓글 작성자인지 확인한다.
 
     Args:
         mb_id_object (object): mb_id 속성을 가진 객체
@@ -663,7 +707,12 @@ def is_owner(mb_id_object: object, mb_id: str = None):
         return False
 
 
-def send_write_mail(request: Request, board: Board, write: WriteBaseModel, origin_write: WriteBaseModel = None):
+def send_write_mail(
+    request: Request,
+    board: Board,
+    write: WriteBaseModel,
+    origin_write: WriteBaseModel = None,
+):
     """게시글/답글/댓글 작성 시, 메일을 발송한다.
 
     Args:
@@ -674,8 +723,7 @@ def send_write_mail(request: Request, board: Board, write: WriteBaseModel, origi
     """
     with DBConnect().sessionLocal() as db:
         config = request.state.config
-        templates = Jinja2Templates(
-                directory=TemplateService.get_templates_dir())
+        templates = Jinja2Templates(directory=TemplateService.get_templates_dir())
 
         def _add_admin_email(admin_id: str):
             admin = db.scalar(select(Member).filter_by(mb_id=admin_id))
@@ -694,27 +742,41 @@ def send_write_mail(request: Request, board: Board, write: WriteBaseModel, origi
 
         if write.wr_is_comment:
             act = "댓글"
-            link_url = str(request.url_for("read_post", bo_table=board.bo_table, wr_id=origin_write.wr_id)) + f"#c_{write.wr_id}"
+            link_url = (
+                str(
+                    request.url_for(
+                        "read_post", bo_table=board.bo_table, wr_id=origin_write.wr_id
+                    )
+                )
+                + f"#c_{write.wr_id}"
+            )
 
             if config.cf_email_wr_comment_all:
                 # 댓글 쓴 모든 이에게 메일 발송
                 write_model = dynamic_create_write_table(board.bo_table)
-                query = select(write_model.wr_email).distinct().where(
-                    write_model.wr_email.notin_(["", write.wr_email]),
-                    write_model.wr_parent == origin_write.wr_id
+                query = (
+                    select(write_model.wr_email)
+                    .distinct()
+                    .where(
+                        write_model.wr_email.notin_(["", write.wr_email]),
+                        write_model.wr_parent == origin_write.wr_id,
+                    )
                 )
                 comments = db.scalars(query).all()
                 send_email_list.extend(email for email in comments)
         else:
             act = "답변글" if origin_write else "새글"
-            link_url = request.url_for("read_post", bo_table=board.bo_table, wr_id=write.wr_id)
+            link_url = request.url_for(
+                "read_post", bo_table=board.bo_table, wr_id=write.wr_id
+            )
 
         # 중복 이메일 제거
         send_email_list = list(set(send_email_list))
         for email in send_email_list:
             subject = f"[{config.cf_title}] {board.bo_subject} 게시판에 {act}이 등록되었습니다."
             body = templates.TemplateResponse(
-                "bbs/mail_form/write_update_mail.html", {
+                "bbs/mail_form/write_update_mail.html",
+                {
                     "request": request,
                     "act": act,
                     "board": board,
@@ -722,12 +784,25 @@ def send_write_mail(request: Request, board: Board, write: WriteBaseModel, origi
                     "wr_name": write.wr_name,
                     "wr_content": write.wr_content,
                     "link_url": link_url,
-                }
+                },
             ).body.decode("utf-8")
-            mailer(get_admin_email(request), email, subject, body, get_admin_email_name(request))
+            mailer(
+                get_admin_email(request),
+                email,
+                subject,
+                body,
+                get_admin_email_name(request),
+            )
 
 
-def get_list_thumbnail(request: Request, board: Board, write: WriteBaseModel, thumb_width: int, thumb_height: int, **kwargs):
+def get_list_thumbnail(
+    request: Request,
+    board: Board,
+    write: WriteBaseModel,
+    thumb_width: int,
+    thumb_height: int,
+    **kwargs,
+):
     """게시글 목록의 섬네일 이미지를 생성한다.
 
     Args:
@@ -742,7 +817,7 @@ def get_list_thumbnail(request: Request, board: Board, write: WriteBaseModel, th
         service = FileService(request, db)
         images, files = service.get_board_files_by_type(board.bo_table, write.wr_id)
     source_file = None
-    result = {"src": "", "alt": "", "noimg":""}
+    result = {"src": "", "alt": "", "noimg": ""}
 
     if images:
         # TODO : 게시글의 파일정보를 캐시된 데이터에서 조회한다.
@@ -762,10 +837,12 @@ def get_list_thumbnail(request: Request, board: Board, write: WriteBaseModel, th
                 image = "./data/editor/" + image.split("/data/editor/")[1]
 
                 # image경로의 파일이 존재하고 이미지파일인지 확인
-                if (os.path.exists(image)
-                        and os.path.isfile(image)
-                        and os.path.getsize(image) > 0
-                        and ext in config.cf_image_extension):
+                if (
+                    os.path.exists(image)
+                    and os.path.isfile(image)
+                    and os.path.getsize(image) > 0
+                    and ext in config.cf_image_extension
+                ):
                     source_file = image
                     break
 
@@ -775,12 +852,18 @@ def get_list_thumbnail(request: Request, board: Board, write: WriteBaseModel, th
 
     # 섬네일 생성
     if source_file:
-        result["src"] = thumbnail(source_file, width=thumb_width, height=thumb_height, **kwargs)
+        result["src"] = thumbnail(
+            source_file, width=thumb_width, height=thumb_height, **kwargs
+        )
     # 이미지가 없을 때
     else:
-        result["src"] = thumbnail("./static/img/dummy-donotremove.png",
-                        target_path="./data/thumbnail_tmp",
-                        width=thumb_width, height=thumb_height, **kwargs)
+        result["src"] = thumbnail(
+            "./static/img/dummy-donotremove.png",
+            target_path="./data/thumbnail_tmp",
+            width=thumb_width,
+            height=thumb_height,
+            **kwargs,
+        )
         result["noimg"] = "img_not_found"
 
     return result
@@ -854,7 +937,9 @@ def is_write_delay(request: Request) -> bool:
     if delay_sec > 0:
         time_interval = timedelta(seconds=delay_sec)
         if write_time:
-            available_time = datetime.strptime(write_time, "%Y-%m-%d %H:%M:%S") + time_interval
+            available_time = (
+                datetime.strptime(write_time, "%Y-%m-%d %H:%M:%S") + time_interval
+            )
             if available_time > current_time:
                 return False
 
@@ -878,8 +963,7 @@ def insert_board_new(bo_table: str, write: WriteBaseModel) -> None:
     """
     db = DBConnect().sessionLocal()
     db.execute(
-        insert(BoardNew)
-        .values(
+        insert(BoardNew).values(
             bo_table=bo_table,
             wr_id=write.wr_id,
             wr_parent=write.wr_parent,
@@ -893,14 +977,21 @@ def insert_board_new(bo_table: str, write: WriteBaseModel) -> None:
 def get_bo_table_list(added_bo_table_list: List[str] = None) -> list:
     from install.default_values import default_boards
 
-    bo_table_list = [board_value_dict["bo_table"] for board_value_dict in default_boards]
+    bo_table_list = [
+        board_value_dict["bo_table"] for board_value_dict in default_boards
+    ]
     if added_bo_table_list:
         bo_table_list.extend(added_bo_table_list)
     return bo_table_list
 
 
-def render_latest_posts(request: Request, skin_name: str = 'basic', bo_table: str='',
-                        rows: int = 10, subject_len: int = 40):
+def render_latest_posts(
+    request: Request,
+    skin_name: str = "basic",
+    bo_table: str = "",
+    rows: int = 10,
+    subject_len: int = 40,
+):
     """최신글 목록 HTML 출력
 
     Args:
@@ -934,7 +1025,7 @@ def render_latest_posts(request: Request, skin_name: str = 'basic', bo_table: st
         board_config = BoardConfig(request, board)
         board.subject = board_config.subject
 
-        #게시글 목록 조회
+        # 게시글 목록 조회
         write_model = dynamic_create_write_table(bo_table)
         writes = db.scalars(
             select(write_model)

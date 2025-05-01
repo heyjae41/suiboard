@@ -43,6 +43,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Windows
+venv\Scripts\activate
 source venv\Scripts\activate
 # 또는
 source venv/Scripts/activate
@@ -61,9 +62,11 @@ pip3 install -r requirements.txt
 
 # Linux
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+nohup uvicorn main:app --reload --host 0.0.0.0 > ~/g6/uvicorn.log 2>&1 &
 
 # Windows
 uvicorn main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
 ```
 
 #### 그누보드6 데이터베이스 설정 방법
@@ -284,5 +287,81 @@ IS_RESPONSIVE = "True"
 # 쿠키를 공유하려면 .gnuboard.com 과 같이 입력하세요.
 # 이곳에 입력하지 않으면 www 붙은 도메인과 그렇지 않은 도메인은 쿠키를 공유하지 못하므로 
 # 로그인이 풀릴 수 있습니다.
-COOKIE_DOMAIN = ""
+COOKIE_DOMAIN = "marketmaker.store"
 ```
+
+## G6 게시판의 글쓰기 처리 과정
+### API 엔드포인트:
+/api/v1/boards/{bo_table}/writes (POST)
+agent/board_rest_api.py의 post_to_board() 함수를 통해 호출됨
+
+### 주요 처리 과정:
+#### 1. 게시글 작성 요청 처리
+@router.post("/{bo_table}/writes")
+async def api_create_post(
+    db: db_session,
+    service: Annotated[CreatePostServiceAPI, Depends(CreatePostServiceAPI.async_init)],
+    wr_data: WriteModel,
+) -> ResponseCreateWriteModel:
+
+#### 2. 유효성 검사
+    service.validate_secret_board(wr_data.secret, wr_data.html, wr_data.mail)
+    service.validate_post_content(wr_data.wr_subject)
+    service.validate_post_content(wr_data.wr_content)
+    service.validate_write_level()
+    
+#### 3. 데이터 정리
+    service.arrange_data(wr_data, wr_data.secret, wr_data.html, wr_data.mail)
+    
+#### 4. 게시글 저장
+    write = service.save_write(wr_data.parent_id, wr_data)
+    
+#### 5. 최신글 테이블에 추가
+    insert_board_new(service.bo_table, write)
+    
+#### 6. 포인트 추가
+    service.add_point(write)
+    
+#### 7. 메일 발송 (설정된 경우)
+    parent_write = service.get_parent_post(wr_data.parent_id)
+    service.send_write_mail_(write, parent_write)
+    
+#### 8. 공지글 설정 (설정된 경우)
+    service.set_notice(write.wr_id, wr_data.notice)
+    
+#### 9. 캐시 삭제
+    service.delete_cache()
+    
+#### 10. 트랜잭션 커밋
+    db.commit()
+
+### 주요 테이블 처리:
+g6_write_{bo_table}: 실제 게시글 테이블
+g6_board_new: 최신글 테이블
+g6_point: 포인트 테이블
+
+### 주요 함수들:
+save_write(): 게시글 저장
+insert_board_new(): 최신글 테이블에 추가
+add_point(): 포인트 추가
+send_write_mail_(): 메일 발송
+set_notice(): 공지글 설정
+
+### 데이터 모델:
+class Article(BaseModel):
+    wr_subject: str = ""  # 제목
+    wr_content: str = ""  # 내용
+    wr_name: str = "AINewsAgent"  # 작성자
+    wr_password: str = "Jennifer!002"  # 비밀번호
+    wr_email: str = "moneyit777@gmail.com"  # 이메일
+    wr_homepage: str = "https://marketmaker.store"  # 홈페이지
+    wr_link1: str = ""  # 링크1
+    wr_link2: str = ""  # 링크2
+    wr_option: str = ""  # 옵션
+    html: str = "html1"  # HTML 사용 여부
+    mail: str = ""  # 메일 발송 여부
+    secret: str = ""  # 비밀글 여부
+    ca_name: str = ""  # 카테고리명
+    notice: bool = False  # 공지글 여부
+    parent_id: int = 0  # 부모글 ID
+    wr_comment: int = 0  # 댓글 사용 여부

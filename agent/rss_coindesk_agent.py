@@ -1,36 +1,12 @@
 import feedparser
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
-from pydantic import BaseModel
-from typing import Optional
 import time
 import json
-import requests
 import schedule
-from token_gen import get_token
-
-
-class Article(BaseModel):
-    """커뮤니티 게시판 글 작성을 위한 모델"""
-
-    wr_subject: str = ""
-    wr_content: str = ""
-    wr_name: str = "AINewsAgent"
-    wr_password: str = "Jennifer!002"
-    wr_email: str = "moneyit777@gmail.com"
-    wr_homepage: str = "https://marketmaker.store"
-    wr_link1: str = ""
-    wr_link2: str = ""
-    wr_option: str = ""
-    html: str = "html1"
-    mail: str = ""
-    secret: str = ""
-    ca_name: str = ""
-    notice: bool = False
-    parent_id: int = 0
-    wr_comment: int = 0
+from board_rest_api import post_to_board
 
 
 def get_openai_client():
@@ -84,51 +60,6 @@ def translate_and_summarize_article(
             "title": title,  # 오류 발생시 원본 제목 사용
             "content": translated_text,  # 전체 번역 텍스트를 내용으로 사용
         }
-
-
-def post_to_board(article_data: dict) -> bool:
-    """게시판에 글 작성"""
-    try:
-        # 토큰 가져오기
-        access_token = get_token()
-        if not access_token:
-            print("토큰을 가져올 수 없습니다.")
-            return False
-
-        # API 요청 헤더 설정
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-            "accept": "application/json",
-        }
-
-        # Article 모델에 맞게 데이터 구성
-        article = Article(
-            wr_subject=article_data["title"],
-            wr_content=article_data["content"],
-            ca_name="blockchain",  # ca_name 명시적 설정
-        )
-
-        # API 엔드포인트 설정
-        api_url = "https://marketmaker.store/api/v1/boards/blockchain/writes"
-
-        # API 요청
-        response = requests.post(api_url, headers=headers, json=article.model_dump())
-
-        if response.status_code == 200:
-            print(f"게시글 작성 성공: {article.wr_subject}")
-            return True
-        elif response.status_code == 429:
-            print("너무 많은 요청이 발생했습니다. 잠시 후 다시 시도합니다.")
-            time.sleep(60)  # 1분 대기 후 재시도
-            return post_to_board(article_data)  # 재귀적으로 다시 시도
-        else:
-            print(f"게시글 작성 실패: {response.status_code} - {response.text}")
-            return False
-
-    except Exception as e:
-        print(f"게시글 작성 중 오류 발생: {str(e)}")
-        return False
 
 
 def process_rss_feed(rss_url: str) -> list:
@@ -206,18 +137,18 @@ def process_rss_feed(rss_url: str) -> list:
             # content = content.replace("</div>", "\n").replace("</section>", "\n")
 
             # 링크 태그 처리
-            while "<a href=" in content:
-                start = content.find("<a href=")
-                end = content.find("</a>", start) + 4
-                if end > 4:  # </a>를 찾았을 경우
-                    link_text = content[start:end]
-                    # 링크 텍스트만 추출
-                    text_start = link_text.find(">")
-                    if text_start != -1:
-                        text = link_text[text_start + 1 : link_text.find("</a>")]
-                        content = content.replace(link_text, text)
-                else:
-                    break  # 무한루프 방지
+            # while "<a href=" in content:
+            #     start = content.find("<a href=")
+            #     end = content.find("</a>", start) + 4
+            #     if end > 4:  # </a>를 찾았을 경우
+            #         link_text = content[start:end]
+            #         # 링크 텍스트만 추출
+            #         text_start = link_text.find(">")
+            #         if text_start != -1:
+            #             text = link_text[text_start + 1 : link_text.find("</a>")]
+            #             content = content.replace(link_text, text)
+            #     else:
+            #         break  # 무한루프 방지
 
             # 연속된 빈 줄 제거
             while "\n\n\n" in content:
@@ -243,6 +174,7 @@ def process_rss_feed(rss_url: str) -> list:
                         if image_url
                         else article["content"]
                     ),
+                    "ca_name": "blockchain",
                 }
 
                 # 번역된 기사를 게시판에 작성
@@ -294,7 +226,7 @@ def main():
     print("매 시간 정각에 뉴스를 수집합니다.")
 
     # 매 시간 정각에 실행되도록 스케줄 설정
-    schedule.every().hour.at(":00").do(run_news_collector)
+    schedule.every().hour.at(":05").do(run_news_collector)
 
     # 프로그램 시작 시 즉시 한 번 실행
     run_news_collector()

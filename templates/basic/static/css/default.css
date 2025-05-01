@@ -1,9 +1,10 @@
 @charset "utf-8";
 
 :root {
-    --primaryColor: #4989bc;
+    --primaryColor: #4158d1;
     --react-good: #ff484f;
     --react-nogood: #217aee;
+    --transition: all 0.3s ease;
 }
 
 :root[color-theme='light'] { /* 스위치 버튼 */
@@ -12,7 +13,7 @@
     /* background */
     --inputBg: #fff;
     --inputBgGray: #f6f6f6;
-    --bodyBg: #f6f6f6;
+    --bodyBg: #f8f9fc;
     --contBg: #fff;
     --gnbBg: rgba(0,0,0,0.1);
     --menuBg: #4158d1;
@@ -37,10 +38,10 @@
     --autoPopBg: #e8e8e8;
     --autoHvBg: #dbdbdb;
     /* 폰트색상 */
-    --fontColor: #000;
+    --fontColor: #333;
     --gnbFontColor: #080808;
     --prFontColor: #465168;
-    --btnColor: #000;
+    --btnColor: #333;
     --bovColor: #666;
     --tdColor: #666;
     --bovTitColor: #555;
@@ -67,6 +68,10 @@
     --shareBorder: 1px solid #d5d5d5;
     --autoLiBorder: 1px solid #ffffff;
     --autoUlBorder: 1px solid #e8e8e8;
+    /* shadow */
+    --cardShadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    --btnShadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --hoverShadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
 
 :root[color-theme='dark'] { /* 스위치 버튼 */
@@ -137,22 +142,23 @@
 
 /* 초기화 */
 html { overflow-y:scroll; font-size:62.5%; }
-body { margin:0; padding:0; font-size:1.2rem; font-family:'Malgun Gothic', dotum, sans-serif; background:var(--bodyBg) }
+body { margin:0; padding:0; font-size:1.4rem; font-family:'Noto Sans KR', 'Malgun Gothic', dotum, sans-serif; background:var(--bodyBg); line-height: 1.6; }
 html, form, fieldset, img { margin:0; padding:0; border:0 }
-h1, h2, h3, h4, h5, h6 { font-family:'Malgun Gothic', dotum, sans-serif }
+h1, h2, h3, h4, h5, h6 { font-family:'Noto Sans KR', 'Malgun Gothic', dotum, sans-serif; font-weight: 600; }
 article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section { display:block }
 ul, dl,dt,dd { margin:0; padding:0; list-style:none }
 legend { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: polygon(0 0, 0 0, 0 0); }
-label, input, button, select, img { vertical-align:middle; font-size:1.2rem }
-input, button { margin:0; padding:0; font-family:'Malgun Gothic', dotum, sans-serif; font-size:1.2rem }
+label, input, button, select, img { vertical-align:middle; font-size:1.4rem }
+input, button { margin:0; padding:0; font-family:'Noto Sans KR', 'Malgun Gothic', dotum, sans-serif; font-size:1.4rem }
 input[type="submit"] { cursor:pointer }
 button { cursor:pointer }
-textarea, select { font-family:'Malgun Gothic', dotum, sans-serif; font-size:1.2rem }
+textarea, select { font-family:'Noto Sans KR', 'Malgun Gothic', dotum, sans-serif; font-size:1.4rem }
 select { margin:0 }
-p { margin:0; padding:0; word-break:break-all }
+p { margin:0; padding:0; word-break:break-all; line-height: 1.8; }
 hr { display:none }
 pre { overflow-x:scroll; font-size:1.3rem }
-a { color:var(--fontColor); text-decoration:none }
+a { color:var(--fontColor); text-decoration:none; transition: var(--transition); }
+a:hover { color: var(--primaryColor); }
 
 *, :after, :before { box-sizing:border-box; }
 
@@ -209,7 +215,7 @@ html.remodal-is-locked {overflow-y:scroll !important}
 #tnb:after { display:block; visibility:hidden; clear:both; content:"" }
 #tnb .inner { margin:0 auto }
 
-#hd_wrapper { max-width: 1200px; margin: 0 auto; position: relative; background: var(--primaryColor); border-radius: 8px; height: 80px; display: flex; justify-content: space-between; align-items: center; padding: 0px 20px; }
+#hd_wrapper { max-width: 1200px; margin: 0 auto; position: relative; background: var(--primaryColor); border-radius: 12px; height: 80px; display: flex; justify-content: space-between; align-items: center; padding: 0px 20px; box-shadow: var(--cardShadow); }
 
 #logo { float:left; width: 54px; }
 #logo img { width: 100%; }
@@ -251,9 +257,9 @@ html.remodal-is-locked {overflow-y:scroll !important}
 
 #hd .opener svg { color: #fff; }
 
-#wrapper { margin: 20px auto; }
+#wrapper { margin: 30px auto; }
 
-#container { position:relative; min-height:500px; height:auto !important; border-radius: 8px; border: var(--border); background: var(--contBg); color: var(--fontColor); font-size:1.2rem; }
+#container { position:relative; min-height:500px; height:auto !important; border-radius: 12px; border: var(--border); background: var(--contBg); color: var(--fontColor); font-size:1.4rem; box-shadow: var(--cardShadow); }
 
 #container_title { margin:0 auto; color: var(--primaryColor); font-size:1.6rem; font-weight:bold; }
 #container_title span { display:block; margin:0 auto 24px; line-height:30px }
@@ -262,7 +268,7 @@ html.remodal-is-locked {overflow-y:scroll !important}
 
 #gnb_list { font-size: 1.3rem; }
 
-#gnb { position:relative; margin-bottom: 15px; border: var(--border); background:var(--contBg); overflow: hidden; }
+#gnb { position:relative; margin-bottom: 15px; border: var(--border); background:var(--contBg); overflow: hidden; border-radius: 12px; box-shadow: var(--cardShadow); }
 #gnb_list { font-size:1.3rem; }
 #gnb_list .list_item { position:relative; }
 #gnb_list a { display:block; position:relative; padding: 0 15px; line-height:55px; }
@@ -483,10 +489,10 @@ button.btn02 { display:inline-block; margin:0; padding:7px; border:1px solid #3b
 
 .btn_confirm { text-align:right }/* 서식단계 진행 */
 
-.btn_submit { border:0; background:var(--primaryColor); color:#fff; cursor:pointer; border-radius:3px }
-.btn_submit:hover { background:#285981 }
-.btn_close { border:var(--border); cursor:pointer; border-radius:3px; background:var(--inputBg); color: var(--fontColor); }
-a.btn_close { text-align:center; line-height:50px }
+.btn_submit { border:0; background:var(--primaryColor); color:#fff; cursor:pointer; border-radius:5px; padding: 8px 16px; transition: var(--transition); box-shadow: var(--btnShadow); }
+.btn_submit:hover { background:#285981; transform: translateY(-2px); box-shadow: var(--hoverShadow); }
+.btn_close { border:var(--border); cursor:pointer; border-radius:5px; background:var(--inputBg); color: var(--fontColor); transition: var(--transition); }
+.btn_close:hover { background: var(--bovHover); }
 
 a.btn_cancel { display:inline-block; background:#969696; color:#fff; text-decoration:none; vertical-align:middle }
 button.btn_cancel { display:inline-block; background:#969696; color:#fff; text-decoration:none; vertical-align:middle }

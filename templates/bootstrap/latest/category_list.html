@@ -1,0 +1,44 @@
+{% if board.bo_use_sideview %}
+    {% import "/sideview/macros.html" as sideview %}
+{% endif %}
+
+<div class="category-list mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h3 class="m-0 fs-5 fw-bold">{{ board.subject }}</h3>
+        <a href="{{ url_for('list_post', bo_table=bo_table) }}" class="btn btn-sm btn-outline-secondary" title="더보기">
+            <i class="fa-solid fa-plus"></i>
+        </a>
+    </div>
+    
+    <ul class="list-group list-group-flush">
+        {% for write in writes -%}
+        <li class="list-group-item px-0 py-2 border-bottom">
+            <div class="d-flex align-items-center">
+                <h4 class="mb-0 fs-6 flex-grow-1 text-truncate">
+                    <a href="{{ url_for('read_post', bo_table=bo_table, wr_id=write.wr_id) }}" class="text-decoration-none">
+                        {% if write.is_notice %}<span class="badge bg-primary me-1">공지</span>{% endif %}
+                        {{ write.subject }}
+                    </a>
+                    {% if write.icon_hot %}<span class="badge bg-danger ms-1">인기</span>{% endif %}
+                    {% if write.icon_new %}<span class="badge bg-success ms-1">NEW</span>{% endif %}
+                    {% if write.wr_comment %}<span class="text-muted ms-1">[{{ write.wr_comment }}]</span>{% endif %}
+                </h4>
+            </div>
+            <div class="sub-font small mt-1">
+                <span class="me-2">
+                    {% if board.bo_use_sideview %}
+                        {{ sideview.get(request, write.mb_id, write.name, write.wr_email, write.wr_homepage)|safe }}
+                    {% else %}
+                        <span class="{% if write.mb_id %}member{% else %}guest{% endif %}">
+                            {{ write.name }}
+                        </span>
+                    {% endif %}
+                </span>
+                <span>{{ write.datetime|truncate(10, True, '') }}</span>
+            </div>
+        </li>
+        {% else -%}
+        <li class="list-group-item text-center py-4 sub-font">게시물이 없습니다.</li>
+        {%- endfor %}
+    </ul>
+</div> 
