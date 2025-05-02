@@ -81,15 +81,15 @@ def process_message(message):
             "content": content,
             "ca_name": "stock",
         }
-        print(article_data)
+        # print(article_data)
         # 게시판에 포스팅
-        # if post_to_board(article_data):
-        #     print(f"게시글 작성 성공: {article_data['title']}")
-        #     time.sleep(60)  # 1분 대기
-        #     return True
-        # else:
-        #     print(f"게시글 작성 실패: {article_data['title']}")
-        #     return False
+        if post_to_board(article_data):
+            print(f"게시글 작성 성공: {article_data['title']}")
+            time.sleep(60)  # 1분 대기
+            return True
+        else:
+            print(f"게시글 작성 실패: {article_data['title']}")
+            return False
 
     except Exception as e:
         print(f"메시지 처리 중 오류 발생: {str(e)}")

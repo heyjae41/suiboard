@@ -1,7 +1,7 @@
 import time
 import requests
 from pydantic import BaseModel
-from token_gen import get_token
+from token_gen import get_token, token_manager
 
 
 class Article(BaseModel):
@@ -57,6 +57,13 @@ def post_to_board(article_data: dict) -> bool:
         if response.status_code == 200:
             print(f"게시글 작성 성공: {article.wr_subject}")
             return True
+        elif response.status_code == 401:
+            print("토큰이 만료되었습니다. 토큰을 갱신합니다.")
+            # 토큰 정보 초기화 후 재발급
+            token_manager.token_data = None
+            # 재시도
+            time.sleep(2)  # 약간의 지연
+            return post_to_board(article_data)
         elif response.status_code == 429:
             print("너무 많은 요청이 발생했습니다. 잠시 후 다시 시도합니다.")
             time.sleep(60)  # 1분 대기 후 재시도

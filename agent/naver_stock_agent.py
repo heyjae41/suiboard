@@ -87,8 +87,8 @@ def process_stock_news():
                 "ca_name": "stock",
             }
 
-            print(f"새로운 기사 {len(content.split('<hr>'))-1}개 발견")
-            print(article_data)
+            # print(f"새로운 기사 {len(content.split('<hr>'))-1}개 발견")
+            # print(article_data)
             if post_to_board(article_data):
                 print("게시글 작성 성공")
             else:
