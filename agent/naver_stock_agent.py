@@ -11,6 +11,9 @@ latest_schedule_first_article_title = None  # 이전 스케줄의 첫 번째 기
 def process_stock_news():
     global latest_schedule_first_article_title
     try:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 네이버 주식 뉴스 수집 시작"
+        )
         url = "https://finance.naver.com/news/news_list.naver?mode=LSS3D&section_id=101&section_id2=258&section_id3=401"
         response = requests.get(url)
         soup = BeautifulSoup(response.text, "html.parser")
@@ -93,7 +96,9 @@ def process_stock_news():
                 print("게시글 작성 성공")
             else:
                 print("게시글 작성 실패")
-
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 네이버 주식 뉴스 수집 완료"
+        )
     except Exception as e:
         print(f"오류 발생: {str(e)}")
 
@@ -101,15 +106,44 @@ def process_stock_news():
 def setup_schedule():
     """스케줄 설정"""
     # 매시 정각에 실행
-    schedule.every().hour.at(":00").do(process_stock_news)
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 설정: 매시 정각마다 실행"
+    )
+    job = schedule.every().hour.at(":00").do(process_stock_news)
+    next_run = schedule.next_run()
+    if next_run:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+    else:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+        )
+
     # 초기 실행
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 시작")
     process_stock_news()
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 완료")
 
 
 def run_scheduler():
     """스케줄러 실행"""
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 루프 시작")
     while True:
         schedule.run_pending()
+
+        # 매 10분마다 스케줄러 상태 로깅
+        if datetime.now().minute % 10 == 0 and datetime.now().second == 0:
+            next_run = schedule.next_run()
+            if next_run:
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+                )
+
         time.sleep(1)
 
 

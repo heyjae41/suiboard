@@ -365,3 +365,17 @@ class Article(BaseModel):
     notice: bool = False  # 공지글 여부
     parent_id: int = 0  # 부모글 ID
     wr_comment: int = 0  # 댓글 사용 여부
+
+## Agent
+
+### naver_stock (정상적으로 로그가 출력되면 Ctrl+A+D를 눌러 세션을 백그라운드로 전환)
+screen -S naver_stock
+python agent/naver_stock_agent.py
+
+### coindesk_agent
+screen -S coindesk_agent
+python agent/rss_coindesk_agent.py
+
+### telegram_agent
+screen -S telegram_agent
+python agent/telegram_insider_agent.py

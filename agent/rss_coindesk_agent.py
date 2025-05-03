@@ -195,7 +195,7 @@ def run_news_collector():
         # 시작 시간 기록
         start_time = time.time()
         start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"\n작업 시작 시간: {start_datetime}")
+        print(f"\n뉴스 수집 작업 시작 시간: {start_datetime}")
 
         # RSS 피드 처리
         rss_url = "https://www.coindesk.com/arc/outboundfeeds/rss"
@@ -210,8 +210,8 @@ def run_news_collector():
         print(json.dumps(articles, ensure_ascii=False, indent=2))
 
         # 시간 정보 출력
-        print(f"\n작업 종료 시간: {end_datetime}")
-        print(f"총 소요 시간: {elapsed_time:.2f}초")
+        print(f"\n뉴스 수집 작업 종료 시간: {end_datetime}")
+        print(f"뉴스 수집 작업 총 소요 시간: {elapsed_time:.2f}초")
 
     except Exception as e:
         print(f"오류 발생: {str(e)}")
@@ -222,21 +222,52 @@ def main():
     """메인 함수"""
     load_dotenv()
 
-    print("뉴스 수집 에이전트가 시작되었습니다.")
-    print("매 시간 정각에 뉴스를 수집합니다.")
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 뉴스 수집 에이전트가 시작되었습니다."
+    )
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 매 시간 5분에 뉴스를 수집합니다."
+    )
 
-    # 매 시간 정각에 실행되도록 스케줄 설정
-    schedule.every().hour.at(":05").do(run_news_collector)
+    # 매 시간 5분에 실행되도록 스케줄 설정
+    job = schedule.every().hour.at(":05").do(run_news_collector)
+    next_run = schedule.next_run()
+    if next_run:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+    else:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+        )
 
     # 프로그램 시작 시 즉시 한 번 실행
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 시작")
     run_news_collector()
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 완료")
 
     try:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 루프 시작")
         while True:
             schedule.run_pending()
+
+            # 매 10분마다 스케줄러 상태 로깅
+            if datetime.now().minute % 10 == 0 and datetime.now().second == 0:
+                next_run = schedule.next_run()
+                if next_run:
+                    print(
+                        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                else:
+                    print(
+                        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+                    )
+
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n프로그램이 사용자에 의해 중단되었습니다.")
+        print(
+            f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 프로그램이 사용자에 의해 중단되었습니다."
+        )
 
 
 if __name__ == "__main__":

@@ -101,6 +101,9 @@ def process_telegram_messages():
     global last_processed_message_id
 
     try:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 텔레그램 메시지 처리 시작"
+        )
         client = get_telegram_client()
 
         # 채널 정보 가져오기
@@ -124,36 +127,69 @@ def process_telegram_messages():
             print("새로운 메시지가 없습니다.")
 
         client.disconnect()
-
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 텔레그램 메시지 처리 완료"
+        )
     except Exception as e:
         print(f"텔레그램 메시지 처리 중 오류 발생: {str(e)}")
 
 
 def setup_schedule():
     """스케줄 설정"""
-    # 매시 정각에 실행
-    schedule.every().hour.at(":10").do(process_telegram_messages)
+    # 매시 10분에 실행
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 설정: 매시 10분마다 실행"
+    )
+    job = schedule.every().hour.at(":10").do(process_telegram_messages)
+    next_run = schedule.next_run()
+    if next_run:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+    else:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+        )
+
     # 초기 실행
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 시작")
     process_telegram_messages()
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 완료")
 
 
 def run_scheduler():
     """스케줄러 실행"""
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 루프 시작")
     while True:
         schedule.run_pending()
+
+        # 매 10분마다 스케줄러 상태 로깅
+        if datetime.now().minute % 10 == 0 and datetime.now().second == 0:
+            next_run = schedule.next_run()
+            if next_run:
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
+                )
+
         time.sleep(1)
 
 
 def main():
     """메인 함수"""
     try:
-        print("텔레그램 인사이더 트래킹 봇 시작...")
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 텔레그램 인사이더 트래킹 봇 시작..."
+        )
         setup_schedule()
         run_scheduler()
     except KeyboardInterrupt:
-        print("\n프로그램 종료")
+        print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 프로그램 종료")
     except Exception as e:
-        print(f"오류 발생: {str(e)}")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 오류 발생: {str(e)}")
 
 
 if __name__ == "__main__":
