@@ -70,8 +70,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     debug=settings.APP_IS_DEBUG,  # 디버그 모드가 활성화 설정
     lifespan=lifespan,
-    title="그누보드6",
-    description="",
+    title="수이보드",
+    description="수이보드는 온라인 커뮤니티 플랫폼입니다. 사용자들이 소통하고 콘텐츠를 공유할 수 있는 환경을 제공합니다.",
 )
 
 # git clone으로 소스를 받은 경우에는 data디렉토리가 없으므로 생성해야 함
