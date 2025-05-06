@@ -51,9 +51,8 @@ source venv/Scripts/activate
 
 ```bash
 # 실행에 필요한 파이썬 패키지들을 설치합니다.
-pip install -r requirements.txt
-# 또는
-pip3 install -r requirements.txt
+# pip install -r requirements.txt #이렇게하면 실제 파이썬 인터프리터와 pip 설치한 인터프리터가 달라져서 제대로 설치안될 수 있음
+python -m pip install -r requirements.txt
 ```
 
 ```bash
@@ -61,13 +60,20 @@ pip3 install -r requirements.txt
 # 기본으로 8000번 포트를 사용합니다.
 
 # Linux
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-nohup uvicorn main:app --reload --host 0.0.0.0 > ~/g6/uvicorn.log 2>&1 &
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+nohup uvicorn main:app --reload --host 0.0.0.0 > ~/suiboard/uvicorn.log 2>&1 &
 
 # Windows
-uvicorn main:app --reload
-uvicorn main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 ```
+
+#### 윈도우 피시 개발환경 설치
+cd C:\suiboard
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
 
 #### 그누보드6 데이터베이스 설정 방법
 1. 웹브라우저를 열고 **http://127.0.0.1:8000** 로 접속합니다.

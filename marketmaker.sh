@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# G6 프로젝트 업데이트 및 재시작 스크립트
+# suiboard 프로젝트 업데이트 및 재시작 스크립트
 # 작성자: AI Assistant
 # 작성일: 2024-03-21
 
@@ -18,7 +18,7 @@ error_log() {
 }
 
 # 작업 디렉토리 설정
-PROJECT_DIR="/home/root/g6"  # 실제 G6 프로젝트 경로로 수정 필요
+PROJECT_DIR="/home/root/suiboard"  # 실제 suiboard 프로젝트 경로로 수정 필요
 cd $PROJECT_DIR
 
 # 1. 현재 작업 중인 변경사항 저장
@@ -70,13 +70,13 @@ fi
 
 # 9. 서비스 재시작
 log "서비스 재시작..."
-nohup uvicorn main:app --host 0.0.0.0 --port 8000 > g6.log 2>&1 &
+nohup uvicorn main:app --host 0.0.0.0 --port 8000 > suiboard.log 2>&1 &
 
 # 10. 서비스 상태 확인
 sleep 5
 if pgrep -f "uvicorn main:app" > /dev/null; then
     log "서비스가 성공적으로 재시작되었습니다."
-    log "로그 파일: $PROJECT_DIR/g6.log"
+    log "로그 파일: $PROJECT_DIR/suiboard.log"
 else
     error_log "서비스 재시작 실패"
     exit 1
