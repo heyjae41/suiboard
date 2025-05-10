@@ -1,3 +1,4 @@
+from bbs.zklogin import router as zklogin_router # 사용자 추가: zkLogin 라우터 임포트
 import os
 import re
 from contextlib import asynccontextmanager
@@ -98,6 +99,7 @@ app.include_router(api_router)
 app.include_router(template_router)
 app.include_router(install_router)
 app.include_router(login_router)
+app.include_router(zklogin_router) # 사용자 추가: zkLogin 라우터 등록
 
 
 @app.middleware("http")
@@ -166,7 +168,9 @@ async def main_middleware(request: Request, call_next):
             # 자동 로그인 쿠키가 있다면
             elif cookie_mb_id:
                 mb_id = re.sub("[^a-zA-Z0-9_]", "", cookie_mb_id)[:20]
-                member = member_service.get_member(session_mb_id)
+                member = member_service.get_member(session_mb_id) # 이 부분은 cookie_mb_id를 사용해야 할 것 같습니다. 원본 코드 확인 필요 -> 원본 코드대로 mb_id를 사용하도록 수정.
+                member = member_service.get_member(mb_id)
+
 
                 # 최고관리자는 보안상 자동로그인 기능을 사용하지 않는다.
                 if (
@@ -308,3 +312,4 @@ async def device_change(request: Request, device: str = Path(...)) -> RedirectRe
 
     referer = request.headers.get("Referer", "/")
     return RedirectResponse(referer, status_code=303)
+
