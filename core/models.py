@@ -4,8 +4,20 @@ from typing import List
 # TINYINT 대신 Integer 사용하기 바랍니다.
 # from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy import (
-    BIGINT, Column, Date, DateTime, Enum, ForeignKey, func, Index, Integer,
-    String, Text, Time, text, UniqueConstraint
+    BIGINT,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    func,
+    Index,
+    Integer,
+    String,
+    Text,
+    Time,
+    text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DynamicMapped, Mapped, relationship, declarative_base
 
@@ -20,6 +32,7 @@ class Config(Base):
     """
     환경설정 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "config"
 
     cf_id = Column(Integer, primary_key=True)
@@ -31,24 +44,44 @@ class Config(Base):
     cf_add_script = Column(Text, nullable=False, default="")
     cf_use_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_point_term = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_use_copy_log = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_use_email_certify = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_login_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_use_copy_log = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_use_email_certify = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_login_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_cut_name = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_nick_modify = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_nick_modify = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_new_skin = Column(String(50), nullable=False, default="")
     cf_new_rows = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_search_skin = Column(String(50), nullable=False, default="")
     cf_connect_skin = Column(String(50), nullable=False, default="")
     cf_faq_skin = Column(String(50), nullable=False, default="")
     cf_read_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_write_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_comment_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_download_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_write_pages = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_mobile_pages = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_write_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_comment_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_download_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_write_pages = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_mobile_pages = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_link_target = Column(String(50), nullable=False, default="")
-    cf_bbs_rewrite = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_bbs_rewrite = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_delay_sec = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_filter = Column(Text, nullable=False, default="")
     cf_possible_ip = Column(Text, nullable=False, default="")
@@ -56,61 +89,125 @@ class Config(Base):
     cf_analytics = Column(Text, nullable=False, default="")
     cf_add_meta = Column(Text, nullable=False, default="")
     cf_member_skin = Column(String(50), nullable=False, default="")
-    cf_use_homepage = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_req_homepage = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_use_homepage = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_req_homepage = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_use_tel = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_req_tel = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_use_hp = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_req_hp = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_use_addr = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_req_addr = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_use_signature = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_req_signature = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_use_profile = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_req_profile = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_register_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_register_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_use_signature = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_req_signature = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_use_profile = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_req_profile = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_register_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_register_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_icon_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_use_recommend = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_recommend_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_use_recommend = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_recommend_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_leave_day = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_search_part = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_search_part = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_email_use = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_wr_super_admin = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_wr_group_admin = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_wr_board_admin = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_wr_write = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_wr_comment_all = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_mb_super_admin = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_mb_member = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_email_po_super_admin = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_email_wr_super_admin = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_wr_group_admin = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_wr_board_admin = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_wr_write = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_wr_comment_all = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_mb_super_admin = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_mb_member = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_email_po_super_admin = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_prohibit_id = Column(Text, nullable=False, default="")
     cf_prohibit_email = Column(Text, nullable=False, default="")
     cf_new_del = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_memo_del = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_visit_del = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_popular_del = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_popular_del = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_optimize_date = Column(String(10), nullable=False, default="")
-    cf_use_member_icon = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_icon_size = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_icon_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_icon_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_img_size = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_img_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_member_img_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_login_minutes = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_use_member_icon = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_icon_size = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_icon_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_icon_height = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_img_size = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_img_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_member_img_height = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_login_minutes = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_image_extension = Column(String(255), nullable=False, default="")
     cf_flash_extension = Column(String(255), nullable=False, default="")
     cf_movie_extension = Column(String(255), nullable=False, default="")
-    cf_formmail_is_member = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_formmail_is_member = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_page_rows = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_mobile_page_rows = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_mobile_page_rows = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_visit = Column(String(255), nullable=False, default="")
     cf_max_po_id = Column(Integer, nullable=False, default=0, server_default=text("0"))
     cf_stipulation = Column(Text, nullable=False, default="")
     cf_privacy = Column(Text, nullable=False, default="")
-    cf_open_modify = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    cf_memo_send_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_open_modify = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    cf_memo_send_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_mobile_new_skin = Column(String(50), nullable=False, default="")
     cf_mobile_search_skin = Column(String(50), nullable=False, default="")
     cf_mobile_connect_skin = Column(String(50), nullable=False, default="")
@@ -139,7 +236,9 @@ class Config(Base):
     cf_icode_server_port = Column(String(50), nullable=False, default="")
     cf_icode_token_key = Column(String(100), nullable=False, default="")
     cf_googl_shorturl_apikey = Column(String(50), nullable=False, default="")
-    cf_social_login_use = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    cf_social_login_use = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     cf_social_servicelist = Column(String(255), nullable=False, default="")
     cf_payco_clientid = Column(String(100), nullable=False, default="")
     cf_payco_secret = Column(String(100), nullable=False, default="")
@@ -183,6 +282,7 @@ class Member(Base):
     """
     회원 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "member"
 
     mb_no = Column(Integer, primary_key=True)
@@ -210,13 +310,17 @@ class Member(Base):
     mb_signature = Column(Text, nullable=False, default="")
     mb_recommend = Column(String(255), nullable=False, default="")
     mb_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    mb_today_login = Column(DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0))
+    mb_today_login = Column(
+        DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0)
+    )
     mb_login_ip = Column(String(255), nullable=False, default="")
     mb_datetime = Column(DateTime, nullable=False, default=func.now())
     mb_ip = Column(String(255), nullable=False, default="")
     mb_leave_date = Column(String(8), nullable=False, default="")
     mb_intercept_date = Column(String(8), nullable=False, default="")
-    mb_email_certify = Column(DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0))
+    mb_email_certify = Column(
+        DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0)
+    )
     mb_email_certify2 = Column(String(255), nullable=False, default="")
     mb_memo = Column(Text, nullable=False, default="")
     mb_lost_certify = Column(String(255), nullable=False, default="")
@@ -238,25 +342,46 @@ class Member(Base):
     mb_8 = Column(String(255), nullable=False, default="")
     mb_9 = Column(String(255), nullable=False, default="")
     mb_10 = Column(String(255), nullable=False, default="")
+    mb_sui_address = Column(String(255), nullable=False, default="")
+    mb_google_sub = Column(String(255), nullable=False, default="")
 
     auths: Mapped[List["Auth"]] = relationship("Auth", back_populates="member")
     groups: Mapped[List["GroupMember"]] = relationship(back_populates="member")
-    points: DynamicMapped["Point"] = relationship("Point", back_populates="member", lazy="dynamic")
-    socials: Mapped[List["MemberSocialProfiles"]] = relationship("MemberSocialProfiles", back_populates="member")
-    recv_memos: DynamicMapped["Memo"] = relationship("Memo", back_populates="recv_member", lazy="dynamic", foreign_keys="Memo.me_recv_mb_id")
-    send_memos: DynamicMapped["Memo"] = relationship("Memo", back_populates="send_member", lazy="dynamic", foreign_keys="Memo.me_send_mb_id")
-    scraps: DynamicMapped["Scrap"] = relationship("Scrap", back_populates="member", lazy="dynamic")
+    points: DynamicMapped["Point"] = relationship(
+        "Point", back_populates="member", lazy="dynamic"
+    )
+    socials: Mapped[List["MemberSocialProfiles"]] = relationship(
+        "MemberSocialProfiles", back_populates="member"
+    )
+    recv_memos: DynamicMapped["Memo"] = relationship(
+        "Memo",
+        back_populates="recv_member",
+        lazy="dynamic",
+        foreign_keys="Memo.me_recv_mb_id",
+    )
+    send_memos: DynamicMapped["Memo"] = relationship(
+        "Memo",
+        back_populates="send_member",
+        lazy="dynamic",
+        foreign_keys="Memo.me_send_mb_id",
+    )
+    scraps: DynamicMapped["Scrap"] = relationship(
+        "Scrap", back_populates="member", lazy="dynamic"
+    )
 
 
 class Group(Base):
     """
     게시판 그룹 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "group"
 
     gr_id = Column(String(10), primary_key=True, nullable=False)
     gr_subject = Column(String(255), nullable=False, default="")
-    gr_device = Column(Enum("both", "pc", "mobile", name="gr_device"), nullable=False, default="both")
+    gr_device = Column(
+        Enum("both", "pc", "mobile", name="gr_device"), nullable=False, default="both"
+    )
     gr_admin = Column(String(255), nullable=False, default="")
     gr_use_access = Column(Integer, nullable=False, default=0, server_default=text("0"))
     gr_order = Column(Integer, nullable=False, default=0, server_default=text("0"))
@@ -290,6 +415,7 @@ class GroupMember(Base):
     """
     그룹회원 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "group_member"
 
     gm_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -308,53 +434,106 @@ class Board(Base):
     """
     게시판 설정 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "board"
 
     bo_table = Column(String(20), primary_key=True, nullable=False)
     gr_id = Column(String(255), ForeignKey(Group.gr_id), nullable=False, default="")
     bo_subject = Column(String(255), nullable=False, default="")
     bo_mobile_subject = Column(String(255), nullable=False, default="")
-    bo_device = Column(Enum("both", "pc", "mobile", name="bo_device"), nullable=False, default="both")
+    bo_device = Column(
+        Enum("both", "pc", "mobile", name="bo_device"), nullable=False, default="both"
+    )
     bo_admin = Column(String(255), nullable=False, default="")
     bo_list_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_read_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_write_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_reply_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_comment_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_upload_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_download_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_write_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_reply_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_comment_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_upload_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_download_level = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_html_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_link_level = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_count_delete = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_count_modify = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_count_delete = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_count_modify = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_read_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_write_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_comment_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_download_point = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_category = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_write_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_comment_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_download_point = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_category = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_category_list = Column(Text, nullable=False, default="")
-    bo_use_sideview = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_file_content = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_use_sideview = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_file_content = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_use_secret = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_dhtml_editor = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_use_dhtml_editor = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_select_editor = Column(String(50), nullable=False, default="")
-    bo_use_rss_view = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_use_rss_view = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_use_good = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_use_nogood = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_use_name = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_signature = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_ip_view = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_list_view = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_list_file = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_list_content = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_table_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_subject_len = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_mobile_subject_len = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_use_signature = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_ip_view = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_list_view = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_list_file = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_use_list_content = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_table_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_subject_len = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_mobile_subject_len = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_page_rows = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_mobile_page_rows = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_mobile_page_rows = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_new = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_hot = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_image_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_image_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_skin = Column(String(255), nullable=False, default="")
     bo_mobile_skin = Column(String(255), nullable=False, default="")
     bo_include_head = Column(String(255), nullable=False, default="")
@@ -364,27 +543,57 @@ class Board(Base):
     bo_content_tail = Column(Text, nullable=False, default="")
     bo_mobile_content_tail = Column(Text, nullable=False, default="")
     bo_insert_content = Column(Text, nullable=False, default="")
-    bo_gallery_cols = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_gallery_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_gallery_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_mobile_gallery_width = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_mobile_gallery_height = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_upload_size = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_reply_order = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_gallery_cols = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_gallery_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_gallery_height = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_mobile_gallery_width = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_mobile_gallery_height = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_upload_size = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_reply_order = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_use_search = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_order = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_count_write = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_count_comment = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_count_write = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_count_comment = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_write_min = Column(Integer, nullable=False, default=0, server_default=text("0"))
     bo_write_max = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_comment_min = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_comment_max = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_comment_min = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    bo_comment_max = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_notice = Column(Text, nullable=False, default="")
-    bo_upload_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_upload_count = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_use_email = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_cert = Column(Enum("", "cert", "adult", "hp-cert", "hp-adult", name="bo_use_cert"), nullable=False, default="")
+    bo_use_cert = Column(
+        Enum("", "cert", "adult", "hp-cert", "hp-adult", name="bo_use_cert"),
+        nullable=False,
+        default="",
+    )
     bo_use_sns = Column(Integer, nullable=False, default=0, server_default=text("0"))
-    bo_use_captcha = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    bo_use_captcha = Column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     bo_sort_field = Column(String(255), nullable=False, default="")
     bo_1_subj = Column(String(255), nullable=False, default="")
     bo_2_subj = Column(String(255), nullable=False, default="")
@@ -408,7 +617,9 @@ class Board(Base):
     bo_10 = Column(String(255), nullable=False, default="")
 
     group: Mapped["Group"] = relationship("Group", back_populates="boards")
-    board_news: Mapped[List["BoardNew"]] = relationship("BoardNew", back_populates="board")
+    board_news: Mapped[List["BoardNew"]] = relationship(
+        "BoardNew", back_populates="board"
+    )
     scraps: Mapped[List["Scrap"]] = relationship("Scrap", back_populates="board")
 
 
@@ -417,6 +628,7 @@ class WriteBaseModel(Base):
     게시글, 댓글 테이블
     wr_is_comment : 0=글, 1=댓글
     """
+
     # __tablename__ = DB_TABLE_PREFIX + 'write'
     __abstract__ = True
 
@@ -487,6 +699,7 @@ class Content(Base):
     """
     내용 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "content"
 
     co_id = Column(String(20), primary_key=True, nullable=False, default="")
@@ -507,6 +720,7 @@ class FaqMaster(Base):
     """
     FAQ 분류 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "faq_master"
 
     fm_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -527,6 +741,7 @@ class Faq(Base):
     """
     FAQ 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "faq"
 
     fa_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -545,6 +760,7 @@ class Visit(Base):
     """
     방문자 이력 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "visit"
 
     vi_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -562,6 +778,7 @@ class VisitSum(Base):
     """
     방문자 수 통계 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "visit_sum"
 
     vs_date = Column(Date, primary_key=True, nullable=False, default="")
@@ -572,6 +789,7 @@ class QaConfig(Base):
     """
     Q&A 설정 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "qa_config"
 
     id = Column(Integer, primary_key=True)
@@ -617,6 +835,7 @@ class QaContent(Base):
     """
     Q&A 데이터 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "qa_content"
 
     qa_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -655,6 +874,7 @@ class Menu(Base):
     """
     사용자페이지 메뉴 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "menu"
 
     me_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -671,6 +891,7 @@ class Point(Base):
     """
     포인트 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "point"
 
     po_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -698,28 +919,39 @@ class Memo(Base):
     __tablename__ = DB_TABLE_PREFIX + "memo"
 
     me_id = Column(Integer, primary_key=True, autoincrement=True)
-    me_recv_mb_id = Column(String(20), ForeignKey(Member.mb_id), nullable=False, default="")
-    me_send_mb_id = Column(String(20), ForeignKey(Member.mb_id), nullable=False, default="")
+    me_recv_mb_id = Column(
+        String(20), ForeignKey(Member.mb_id), nullable=False, default=""
+    )
+    me_send_mb_id = Column(
+        String(20), ForeignKey(Member.mb_id), nullable=False, default=""
+    )
     me_send_datetime = Column(DateTime, nullable=False, default=func.now())
-    me_read_datetime = Column(DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0))
+    me_read_datetime = Column(
+        DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0)
+    )
     me_memo = Column(Text, nullable=False)
     me_send_id = Column(Integer, nullable=False, default=0)
-    me_type = Column(Enum("send", "recv", name="me_type"), nullable=False, default="recv")
+    me_type = Column(
+        Enum("send", "recv", name="me_type"), nullable=False, default="recv"
+    )
     me_send_ip = Column(String(100), nullable=False, default="")
 
     # 연관관계
-    recv_member: Mapped["Member"] = relationship("Member", back_populates="recv_memos", foreign_keys=[me_recv_mb_id])
-    send_member: Mapped["Member"] = relationship("Member", back_populates="send_memos", foreign_keys=[me_send_mb_id])
+    recv_member: Mapped["Member"] = relationship(
+        "Member", back_populates="recv_memos", foreign_keys=[me_recv_mb_id]
+    )
+    send_member: Mapped["Member"] = relationship(
+        "Member", back_populates="send_memos", foreign_keys=[me_send_mb_id]
+    )
 
-    __mapper_args__ = {
-        'confirm_deleted_rows': False
-    }
+    __mapper_args__ = {"confirm_deleted_rows": False}
 
 
 class Popular(Base):
     """
     인기검색어 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "popular"
 
     pp_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -735,9 +967,16 @@ class Auth(Base):
     """
     관리자페이지 권한 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "auth"
 
-    mb_id = Column(String(20), ForeignKey(Member.mb_id), primary_key=True, nullable=False, default="")
+    mb_id = Column(
+        String(20),
+        ForeignKey(Member.mb_id),
+        primary_key=True,
+        nullable=False,
+        default="",
+    )
     au_menu = Column(String(20), primary_key=True, nullable=False, default="")
     au_auth = Column(String(255), nullable=False, default="")
 
@@ -748,19 +987,20 @@ class Poll(Base):
     """
     설문조사 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "poll"
 
     po_id = Column(Integer, primary_key=True, autoincrement=True)
-    po_subject = Column(String(255), nullable=False, default='')
-    po_poll1 = Column(String(255), nullable=False, default='')
-    po_poll2 = Column(String(255), nullable=False, default='')
-    po_poll3 = Column(String(255), nullable=False, default='')
-    po_poll4 = Column(String(255), nullable=False, default='')
-    po_poll5 = Column(String(255), nullable=False, default='')
-    po_poll6 = Column(String(255), nullable=False, default='')
-    po_poll7 = Column(String(255), nullable=False, default='')
-    po_poll8 = Column(String(255), nullable=False, default='')
-    po_poll9 = Column(String(255), nullable=False, default='')
+    po_subject = Column(String(255), nullable=False, default="")
+    po_poll1 = Column(String(255), nullable=False, default="")
+    po_poll2 = Column(String(255), nullable=False, default="")
+    po_poll3 = Column(String(255), nullable=False, default="")
+    po_poll4 = Column(String(255), nullable=False, default="")
+    po_poll5 = Column(String(255), nullable=False, default="")
+    po_poll6 = Column(String(255), nullable=False, default="")
+    po_poll7 = Column(String(255), nullable=False, default="")
+    po_poll8 = Column(String(255), nullable=False, default="")
+    po_poll9 = Column(String(255), nullable=False, default="")
     po_cnt1 = Column(Integer, nullable=False, default=0)
     po_cnt2 = Column(Integer, nullable=False, default=0)
     po_cnt3 = Column(Integer, nullable=False, default=0)
@@ -770,12 +1010,12 @@ class Poll(Base):
     po_cnt7 = Column(Integer, nullable=False, default=0)
     po_cnt8 = Column(Integer, nullable=False, default=0)
     po_cnt9 = Column(Integer, nullable=False, default=0)
-    po_etc = Column(String(255), nullable=False, default='')
+    po_etc = Column(String(255), nullable=False, default="")
     po_level = Column(Integer, nullable=False, default=0)
     po_point = Column(Integer, nullable=False, default=0)
     po_date = Column(Date, nullable=False, default=func.now())
-    po_ips = Column(Text, nullable=False, default='')
-    mb_ids = Column(Text, nullable=False, default='')
+    po_ips = Column(Text, nullable=False, default="")
+    mb_ids = Column(Text, nullable=False, default="")
     po_use = Column(Integer, nullable=False, default=1)
 
     etcs: Mapped[List["PollEtc"]] = relationship("PollEtc", back_populates="poll")
@@ -785,21 +1025,24 @@ class PollEtc(Base):
     """
     설문조사 기타의견 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "poll_etc"
 
     pc_id = Column(Integer, primary_key=True, autoincrement=True)
     po_id = Column(Integer, ForeignKey(Poll.po_id), nullable=False, default=0)
-    mb_id = Column(String(20), nullable=False, default='')
-    pc_name = Column(String(255), nullable=False, default='')
-    pc_idea = Column(String(255), nullable=False, default='')
+    mb_id = Column(String(20), nullable=False, default="")
+    pc_name = Column(String(255), nullable=False, default="")
+    pc_idea = Column(String(255), nullable=False, default="")
     pc_datetime = Column(DateTime, nullable=False, default=func.now())
 
     poll: Mapped["Poll"] = relationship("Poll", back_populates="etcs")
+
 
 class AutoSave(Base):
     """
     게시글 자동저장
     """
+
     __tablename__ = DB_TABLE_PREFIX + "autosave"
 
     as_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -814,6 +1057,7 @@ class UniqId(Base):
     """
     유니크아이디 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "uniqid"
 
     uq_id = Column(BIGINT, primary_key=True)
@@ -824,11 +1068,12 @@ class NewWin(Base):
     """
     레이어 팝업 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'new_win'
+
+    __tablename__ = DB_TABLE_PREFIX + "new_win"
 
     nw_id = Column(Integer, primary_key=True, autoincrement=True)
-    nw_division = Column(String(10), nullable=False, default='both')
-    nw_device = Column(String(10), nullable=False, default='both')
+    nw_division = Column(String(10), nullable=False, default="both")
+    nw_device = Column(String(10), nullable=False, default="both")
     nw_begin_time = Column(DateTime, nullable=False, default=func.now())
     nw_end_time = Column(DateTime, nullable=False, default=func.now())
     nw_disable_hours = Column(Integer, nullable=False, default=0)
@@ -845,28 +1090,32 @@ class Mail(Base):
     """
     회원메일발송 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'mail'
+
+    __tablename__ = DB_TABLE_PREFIX + "mail"
 
     ma_id = Column(Integer, primary_key=True, autoincrement=True)
-    ma_subject = Column(String(255), nullable=False, default='')
-    ma_content = Column(Text, nullable=False, default='')
+    ma_subject = Column(String(255), nullable=False, default="")
+    ma_content = Column(Text, nullable=False, default="")
     ma_time = Column(DateTime, nullable=False, default=func.now())
-    ma_ip = Column(String(255), nullable=False, default='')
-    ma_last_option = Column(Text, nullable=False, default='')
+    ma_ip = Column(String(255), nullable=False, default="")
+    ma_last_option = Column(Text, nullable=False, default="")
 
 
 class BoardNew(Base):
     """
     최신 게시물 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'board_new'
+
+    __tablename__ = DB_TABLE_PREFIX + "board_new"
 
     bn_id = Column(Integer, primary_key=True, autoincrement=True)
-    bo_table = Column(String(20), ForeignKey(Board.bo_table), nullable=False, default='')
+    bo_table = Column(
+        String(20), ForeignKey(Board.bo_table), nullable=False, default=""
+    )
     wr_id = Column(Integer, nullable=False, default=0)
     wr_parent = Column(Integer, nullable=False, default=0)
     bn_datetime = Column(DateTime, nullable=False, default=func.now())
-    mb_id = Column(String(20), nullable=False, default='')
+    mb_id = Column(String(20), nullable=False, default="")
 
     board: Mapped["Board"] = relationship("Board", back_populates="board_news")
 
@@ -875,11 +1124,14 @@ class Scrap(Base):
     """
     게시글 스크랩 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'scrap'
+
+    __tablename__ = DB_TABLE_PREFIX + "scrap"
 
     ms_id = Column(Integer, primary_key=True, autoincrement=True)
-    mb_id = Column(String(20), ForeignKey(Member.mb_id), nullable=False, default='')
-    bo_table = Column(String(20), ForeignKey(Board.bo_table), nullable=False, default='')
+    mb_id = Column(String(20), ForeignKey(Member.mb_id), nullable=False, default="")
+    bo_table = Column(
+        String(20), ForeignKey(Board.bo_table), nullable=False, default=""
+    )
     wr_id = Column(Integer, nullable=False, default=0)
     ms_datetime = Column(DateTime, nullable=False, default=func.now())
 
@@ -891,14 +1143,15 @@ class BoardGood(Base):
     """
     게시글 좋아요/싫어요 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'board_good'
-    __table_args__ = (UniqueConstraint('bo_table', 'wr_id', 'mb_id', name='fkey1'), )
+
+    __tablename__ = DB_TABLE_PREFIX + "board_good"
+    __table_args__ = (UniqueConstraint("bo_table", "wr_id", "mb_id", name="fkey1"),)
 
     bg_id = Column(Integer, primary_key=True, autoincrement=True)
-    bo_table = Column(String(20), nullable=False, default='')
+    bo_table = Column(String(20), nullable=False, default="")
     wr_id = Column(Integer, nullable=False, default=0)
-    mb_id = Column(String(20), nullable=False, default='')
-    bg_flag = Column(String(255), nullable=False, default='')
+    mb_id = Column(String(20), nullable=False, default="")
+    bg_flag = Column(String(255), nullable=False, default="")
     bg_datetime = Column(DateTime, nullable=False, default=func.now())
 
 
@@ -906,18 +1159,19 @@ class BoardFile(Base):
     """
     게시글 파일 테이블
     """
-    __tablename__ = DB_TABLE_PREFIX + 'board_file'
 
-    bo_table = Column(String(20), primary_key=True, nullable=False, default='')
+    __tablename__ = DB_TABLE_PREFIX + "board_file"
+
+    bo_table = Column(String(20), primary_key=True, nullable=False, default="")
     wr_id = Column(Integer, primary_key=True, nullable=False, default=0)
     bf_no = Column(Integer, primary_key=True, nullable=False, default=0)
-    bf_source = Column(String(255), nullable=False, default='')
-    bf_file = Column(String(255), nullable=False, default='')
+    bf_source = Column(String(255), nullable=False, default="")
+    bf_file = Column(String(255), nullable=False, default="")
     bf_download = Column(Integer, nullable=False, default=0)
     bf_content = Column(Text, nullable=False)
-    bf_fileurl = Column(String(255), nullable=False, default='')
-    bf_thumburl = Column(String(255), nullable=False, default='')
-    bf_storage = Column(String(50), nullable=False, default='')
+    bf_fileurl = Column(String(255), nullable=False, default="")
+    bf_thumburl = Column(String(255), nullable=False, default="")
+    bf_storage = Column(String(50), nullable=False, default="")
     bf_filesize = Column(Integer, nullable=False, default=0)
     bf_width = Column(Integer, nullable=False, default=0)
     bf_height = Column(Integer, nullable=False, default=0)
@@ -929,6 +1183,7 @@ class MemberSocialProfiles(Base):
     """
     회원 소셜 프로필 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "member_social_profiles"
 
     mp_no = Column(Integer, primary_key=True, autoincrement=True)
@@ -940,7 +1195,9 @@ class MemberSocialProfiles(Base):
     photourl = Column(String(255), nullable=False, default="")
     displayname = Column(String(255), nullable=False, default="")
     description = Column(String(255), nullable=False, default="")
-    mp_register_day = Column(DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0))
+    mp_register_day = Column(
+        DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0)
+    )
     mp_latest_day = Column(DateTime, nullable=False, default=datetime(1, 1, 1, 0, 0, 0))
 
     member: Mapped["Member"] = relationship("Member", back_populates="socials")
@@ -950,11 +1207,12 @@ class Login(Base):
     """
     현재 로그인 및 접속자 테이블
     """
+
     __tablename__ = DB_TABLE_PREFIX + "login"
 
     lo_id = Column(Integer, primary_key=True, autoincrement=True)  # 새로 추가된 기본키
-    lo_ip = Column(String(100), nullable=False, default='')
-    mb_id = Column(String(20), nullable=False, default='')
+    lo_ip = Column(String(100), nullable=False, default="")
+    mb_id = Column(String(20), nullable=False, default="")
     lo_datetime = Column(DateTime, nullable=False, default=func.now())
     lo_location = Column(Text, nullable=False)
     lo_url = Column(Text, nullable=False)

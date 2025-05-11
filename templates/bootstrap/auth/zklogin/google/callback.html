@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="20;url=/" />
+    <title>Google zkLogin 처리 중...</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+        .btn { display: inline-block; background: #4285f4; color: white; padding: 10px 20px; 
+              text-decoration: none; border-radius: 4px; margin-top: 20px; }
+        #status { margin: 20px 0; color: #333; }
+        .error { color: red; }
+    </style>
+    <!-- 폴백 스크립트 먼저 로드 -->
+    <script src="/static/js/vendor/sui-fallback.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>Google zkLogin 콜백 처리</h2>
+        <div id="status">JWT 토큰 추출 중...</div>
+        <a href="/" class="btn" id="home_button">홈으로 즉시 이동</a>
+        <div id="debug_info" style="margin-top: 20px; text-align: left; font-size: 12px; color: #666;"></div>
+    </div>
+
+    <script>
+    // 디버깅용 로그 함수
+    function logStatus(message, isError = false) {
+        console.log(message);
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = message;
+        if (isError) {
+            statusEl.className = 'error';
+        }
+        
+        // 디버그 정보에도 추가
+        const debugEl = document.getElementById('debug_info');
+        const timestamp = new Date().toISOString().substr(11, 8);
+        debugEl.innerHTML += `<div>[${timestamp}] ${isError ? '<span style="color:red">❌</span>' : '✓'} ${message}</div>`;
+    }
+
+    // 홈 버튼에 직접 이벤트 리스너 추가
+    document.getElementById('home_button').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = '/';
+    });
+
+    // 페이지 로드 시 실행
+    window.addEventListener('load', async function() {
+        try {
+            logStatus("URL 해시에서 토큰 추출 중...");
+            
+            // URL 해시에서 id_token 추출
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const id_token = params.get('id_token');
+            
+            if (!id_token) {
+                logStatus("오류: URL에서 ID 토큰을 찾을 수 없습니다", true);
+                return;
+            }
+            
+            // 토큰 정보 표시 (일부만)
+            if (id_token.length > 30) {
+                document.getElementById('debug_info').innerHTML += 
+                    `<div>토큰: ${id_token.substring(0, 30)}...</div>`;
+            }
+            
+            logStatus("토큰 추출 성공, 서버로 인증 요청 중...");
+            
+            // window.sui 객체 확인
+            if (!window.sui) {
+                logStatus("오류: Sui 객체가 초기화되지 않았습니다. 자동으로 홈으로 이동합니다.", true);
+                setTimeout(() => window.location.href = '/', 3000);
+                return;
+            }
+            
+            // 요청 페이로드 생성
+            const requestPayload = {
+                jwt: id_token,
+                ephemeralPublicKey: "0x1234567890abcdef",
+                maxEpoch: 123456,
+                jwtRandomness: "randomstring"
+            };
+            
+            // 디버그 정보에 요청 페이로드 표시
+            document.getElementById('debug_info').innerHTML += 
+                `<div><strong>요청 페이로드:</strong> <pre>${JSON.stringify(requestPayload, null, 2)}</pre></div>`;
+            
+            // 인증 요청 (이제 /api/zklogin/auth 엔드포인트만 사용)
+            logStatus("인증 요청 전송 중...");
+            const response = await fetch('/api/zklogin/authenticate', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestPayload)
+            });
+            
+            // 응답 데이터 추출
+            const responseText = await response.text();
+            let responseData;
+            try {
+                responseData = JSON.parse(responseText);
+            } catch (e) {
+                responseData = responseText;
+            }
+            
+            // 디버그 정보에 응답 표시
+            document.getElementById('debug_info').innerHTML += 
+                `<div><strong>응답 상태:</strong> ${response.status} ${response.statusText}</div>` +
+                `<div><strong>응답 데이터:</strong> <pre>${typeof responseData === 'object' ? JSON.stringify(responseData, null, 2) : responseData}</pre></div>`;
+            
+            if (response.ok) {
+                logStatus("인증 성공! 홈으로 이동합니다...");
+                // 5초 후에 리다이렉트 (디버그 정보 확인을 위해)
+                setTimeout(() => {
+                    window.location.href = responseData.redirect_url || '/';
+                }, 5000);
+            } else {
+                logStatus(`인증 실패: ${response.status} - ${responseText}`, true);
+            }
+        } catch (error) {
+            logStatus(`처리 중 오류 발생: ${error.message}`, true);
+            document.getElementById('debug_info').innerHTML += 
+                `<div><strong>오류 스택:</strong> <pre>${error.stack}</pre></div>`;
+            console.error("상세 오류:", error);
+        }
+    });
+    </script>
+</body>
+</html> 

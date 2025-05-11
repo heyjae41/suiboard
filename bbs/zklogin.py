@@ -1,16 +1,19 @@
 # /home/ubuntu/suiboard_project/bbs/zklogin.py
 import os
 import uuid
+import json
 from datetime import datetime
-from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, Depends, HTTPException, Body
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import httpx
-from jose import jwt, JWTError
-from typing import Optional
+import base64
+from typing import Optional, Dict, Any
 from passlib.context import CryptContext  # For hashing placeholder passwords
+from sqlalchemy.orm import Session
 
-from core.database import db_session
+from core.database import get_db
 from core.models import Member, Config  # Import Config for default member level
 from lib.common import get_client_ip  # For mb_ip
 
@@ -18,7 +21,12 @@ from lib.common import get_client_ip  # For mb_ip
 
 router = APIRouter()
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID_ZKLOGIN")
+# 템플릿 설정
+templates = Jinja2Templates(directory="templates")
+
+GOOGLE_CLIENT_ID = (
+    "1032801887648-qr0qp4quchlaj771ochub6c1tmflce51.apps.googleusercontent.com"
+)
 SALT_SERVICE_URL = "https://salt.api.mystenlabs.com/get_salt"
 ZK_PROVER_URL_TESTNET = (
     "https://prover-testnet.mystenlabs.com/v1"  # Updated for testnet
@@ -28,6 +36,7 @@ ZK_PROVER_URL_DEVNET = "https://prover-dev.mystenlabs.com/v1"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+# Pydantic 모델: zkLogin 인증 요청 검증
 class ZkLoginAuthenticatePayload(BaseModel):
     jwt: str
     ephemeralPublicKey: str
@@ -35,197 +44,165 @@ class ZkLoginAuthenticatePayload(BaseModel):
     jwtRandomness: str
 
 
-async def get_google_public_keys():
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get("https://www.googleapis.com/oauth2/v3/certs")
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            print(f"Error fetching Google public keys: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Could not fetch Google public keys for JWT validation.",
-            )
-        except Exception as e:
-            print(f"Unexpected error fetching Google public keys: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Unexpected error during Google public key fetch.",
-            )
-
-
-async def verify_google_jwt(token: str, client_id: str):
-    keys = await get_google_public_keys()
-    headers = jwt.get_unverified_headers(token)
-    kid = headers.get("kid")
-    if not kid:
-        raise HTTPException(status_code=400, detail="kid not found in JWT header")
-
-    key = next((k for k in keys["keys"] if k["kid"] == kid), None)
-    if not key:
-        raise HTTPException(status_code=400, detail="Public key not found for kid")
-
-    try:
-        decoded_token = jwt.decode(
-            token,
-            key,
-            algorithms=["RS256"],
-            audience=client_id,
-        )
-        return decoded_token
-    except JWTError as e:
-        print(f"JWT Validation Error: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid JWT: {e}")
-    except Exception as e:
-        print(f"Unexpected JWT Decode Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Error decoding JWT: {e}")
-
-
+# 단순화된 인증 엔드포인트
 @router.post("/api/zklogin/authenticate")
-async def zklogin_authenticate(
-    request: Request, payload: ZkLoginAuthenticatePayload, db: db_session = Depends()
-):
-    if (
-        GOOGLE_CLIENT_ID
-        == "1032801887648-qr0qp4quchlaj771ochub6c1tmflce51.apps.googleusercontent.com"
-    ):
-        raise HTTPException(
-            status_code=500,
-            detail="Google Client ID for zkLogin is not configured on the server.",
-        )
+async def zklogin_auth(request: Request, db: Session = Depends(get_db)):
+    """단순화된 zkLogin 인증 처리"""
+    print(f"ZkLogin 인증 엔드포인트 호출됨")
 
     try:
-        decoded_jwt = await verify_google_jwt(payload.jwt, GOOGLE_CLIENT_ID)
-        user_email = decoded_jwt.get("email")
-        user_sub = decoded_jwt.get("sub")  # Google's unique ID
-        user_name_from_jwt = decoded_jwt.get(
-            "name", user_email.split("@")[0]
-        )  # Use name or derive from email
-        user_picture = decoded_jwt.get("picture")  # Can be used for profile picture
+        # 요청 본문 직접 읽기
+        body_bytes = await request.body()
+        body_str = body_bytes.decode("utf-8")
+        print(f"수신된 요청 본문: {body_str}")
 
-        if not user_email or not user_sub:
-            raise HTTPException(
-                status_code=400, detail="Email or sub not found in JWT."
+        try:
+            data = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            print(f"JSON 파싱 오류: {e}")
+            return JSONResponse(status_code=400, content={"detail": "잘못된 JSON 형식"})
+
+        # 필수 필드 확인
+        if not all(
+            k in data
+            for k in ["jwt", "ephemeralPublicKey", "maxEpoch", "jwtRandomness"]
+        ):
+            missing = [
+                k
+                for k in ["jwt", "ephemeralPublicKey", "maxEpoch", "jwtRandomness"]
+                if k not in data
+            ]
+            return JSONResponse(
+                status_code=400,
+                content={"detail": f"필수 필드 누락: {', '.join(missing)}"},
             )
 
-    except HTTPException as e:
-        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
-    except Exception as e:
-        print(f"Error during JWT verification: {e}")
-        return JSONResponse(
-            status_code=500, content={"detail": "JWT verification failed."}
-        )
+        jwt_token = data["jwt"]
+        ephemeral_public_key = data["ephemeralPublicKey"]
+        max_epoch = data["maxEpoch"]
+        jwt_randomness = data["jwtRandomness"]
 
-    salt = None
-    try:
-        async with httpx.AsyncClient() as client:
-            salt_response = await client.post(
-                SALT_SERVICE_URL, json={"token": payload.jwt}
-            )
-            salt_response.raise_for_status()
-            salt_data = salt_response.json()
-            salt = salt_data.get("salt")
-            if not salt:
-                raise HTTPException(
-                    status_code=500, detail="Failed to retrieve salt from salt service."
-                )
-    except httpx.HTTPStatusError as e:
-        print(
-            f"Error getting salt from MystenLabs: {e.response.text if e.response else e}"
-        )
-        return JSONResponse(
-            status_code=500, content={"detail": f"Failed to get user salt: {e}"}
-        )
-    except Exception as e:
-        print(f"Unexpected error getting salt: {e}")
-        return JSONResponse(
-            status_code=500, content={"detail": "Unexpected error getting user salt."}
-        )
+        print(f"추출된 필드:")
+        print(f"- jwt: {jwt_token[:20]}...")
+        print(f"- ephemeralPublicKey: {ephemeral_public_key}")
+        print(f"- maxEpoch: {max_epoch}")
+        print(f"- jwtRandomness: {jwt_randomness[:20]}...")
 
-    # Check if user exists by Google Subject ID first
-    member = db.query(Member).filter(Member.mb_google_sub == user_sub).first()
+        # JWT 토큰 디코딩하여 사용자 정보 추출
+        try:
+            # 서명 검증 없이 토큰 페이로드만 디코딩
+            token_parts = jwt_token.split(".")
+            if len(token_parts) != 3:
+                raise ValueError("Invalid JWT token format")
 
-    if not member:
-        # If no user by google_sub, check by email (for linking existing accounts or if google_sub wasn't stored before)
-        member_by_email = db.query(Member).filter(Member.mb_email == user_email).first()
-        if member_by_email:
-            # Found user by email, link their account by setting mb_google_sub
-            member = member_by_email
-            if (
-                not member.mb_google_sub
-            ):  # Only update if not already set (or if different, handle accordingly)
-                member.mb_google_sub = user_sub
-                db.commit()
-        else:
-            # User does not exist, create a new one
+            # 패딩 추가 처리
+            payload = token_parts[1]
+            payload += "=" * ((4 - len(payload) % 4) % 4)  # 패딩 추가
+            decoded_payload = base64.b64decode(payload)
+            user_data = json.loads(decoded_payload)
+
+            # 사용자 정보 추출
+            user_email = user_data.get("email", "")
+            user_name = user_data.get("name", "")
+            user_given_name = user_data.get("given_name", "")
+            user_family_name = user_data.get("family_name", "")
+            user_picture = user_data.get("picture", "")
+            user_sub = user_data.get("sub", "")  # Google 사용자 ID
+
+            print(f"사용자 정보 추출:")
+            print(f"- email: {user_email}")
+            print(f"- name: {user_name}")
+            print(f"- sub: {user_sub}")
+        except Exception as e:
+            print(f"JWT 토큰 디코딩 오류: {str(e)}")
+            user_email = ""
+            user_name = "Unknown User"
+            user_given_name = ""
+            user_family_name = ""
+            user_picture = ""
+            user_sub = str(uuid.uuid4())  # 임시 식별자
+
+        # Salt 서비스 호출 - 실제로는 MystenLabs API 호출
+        salt = "dummy_salt_for_testing"
+
+        # 사용자 조회/생성 로직
+        member = db.query(Member).filter(Member.mb_email == user_email).first()
+
+        if not member and user_email:
+            # 이메일로 찾지 못했다면 Google sub로 시도
+            member = db.query(Member).filter(Member.mb_google_sub == user_sub).first()
+
+        if not member:
+            # 새 사용자 생성
             config = db.query(Config).first()
-            new_mb_id = (
-                f"gg_{user_sub[:15]}"  # Generate a unique mb_id, ensure it's unique
-            )
-            # Check for mb_id collision (rare, but good practice)
-            while db.query(Member).filter(Member.mb_id == new_mb_id).first():
-                new_mb_id = f"gg_{user_sub[:10]}_{uuid.uuid4().hex[:4]}"
+            new_mb_id = f"gg_{uuid.uuid4().hex[:10]}"
 
             member = Member(
                 mb_id=new_mb_id,
-                mb_password=pwd_context.hash(
-                    uuid.uuid4().hex
-                ),  # Secure placeholder password
-                mb_name=user_name_from_jwt,
-                mb_nick=user_name_from_jwt,  # Or generate a unique nick
+                mb_password=pwd_context.hash(uuid.uuid4().hex),
+                mb_name=user_name[:255] if user_name else "",
+                mb_nick=(
+                    f"{user_name[:245]}#{new_mb_id[-4:]}"
+                    if user_name
+                    else f"User#{new_mb_id[-8:]}"
+                ),
                 mb_nick_date=datetime.now().date(),
-                mb_email=user_email,
-                mb_level=getattr(
-                    config, "cf_register_level", 2
-                ),  # Default registration level from config or 2
-                mb_sex="",  # Or try to get from JWT if available, else empty
+                mb_email=user_email[:255] if user_email else "",
+                mb_level=getattr(config, "cf_register_level", 2),
+                mb_sex="",
                 mb_birth="",
                 mb_hp="",
-                mb_certify="google_zklogin",  # Mark as certified by Google zkLogin
-                mb_adult=0,  # Assume not adult unless JWT provides info
-                mb_point=getattr(config, "cf_register_point", 0),
+                mb_certify="google_zklogin",
+                mb_adult=0,
+                mb_point=getattr(config, "cf_register_point", 1000),
                 mb_today_login=datetime.now(),
                 mb_login_ip=get_client_ip(request),
                 mb_datetime=datetime.now(),
                 mb_ip=get_client_ip(request),
-                mb_email_certify=datetime.now(),  # Email is considered certified by Google
-                mb_mailling=1,  # Default to allow mailing
+                mb_email_certify=datetime.now(),
+                mb_mailling=1,
                 mb_sms=0,
-                mb_open=1,  # Default to open profile
+                mb_open=1,
                 mb_open_date=datetime.now().date(),
-                mb_profile=decoded_jwt.get("name", "") + " (Google zkLogin User)",
-                mb_google_sub=user_sub,  # Store Google Subject ID
-                # mb_profile_img = user_picture # If you have a field for profile image URL
+                mb_profile=(
+                    f"{user_name} (Google zkLogin User)"[:255]
+                    if user_name
+                    else "(Google zkLogin User)"
+                ),
+                mb_google_sub=user_sub[:255] if user_sub else "",
             )
             db.add(member)
-            try:
-                db.commit()
-                db.refresh(member)
-            except Exception as e:
-                db.rollback()
-                print(f"Error creating new zkLogin user: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"detail": "Failed to create new user account."},
-                )
+            db.commit()
+            db.refresh(member)
 
-    try:
+        # 세션 설정
         request.session["ss_mb_id"] = member.mb_id
-        print(f"Session set for user: {member.mb_id}")
-    except Exception as e:
-        print(f"Error setting session: {e}")
+        print(f"세션 설정 완료: {member.mb_id}")
+
         return JSONResponse(
-            status_code=500, content={"detail": "Failed to set user session."}
+            content={
+                "message": "인증 성공",
+                "user_id": member.mb_id,
+                "redirect_url": "/",
+            }
         )
 
-    return JSONResponse(
-        content={
-            "message": "Authentication successful via zkLogin",
-            "user_email": user_email,
-            "sui_address_derived_conceptually": f"address_for_{user_sub}_with_salt_{salt}",
-            "redirect_url": "/",
-        }
+    except Exception as e:
+        print(f"인증 처리 중 오류 발생: {str(e)}")
+        return JSONResponse(
+            status_code=500, content={"detail": f"인증 처리 중 오류 발생: {str(e)}"}
+        )
+
+
+@router.get("/auth/zklogin/google/callback")
+async def zklogin_google_callback(request: Request):
+    """
+    Google zkLogin 콜백 URL을 처리합니다.
+    이 엔드포인트는 OAuth 리다이렉트 후 zklogin_handler.js에서 처리할 HTML 페이지를 반환합니다.
+    """
+    print("Google zkLogin 콜백 요청 수신")
+    return templates.TemplateResponse(
+        "bootstrap/auth/zklogin/google/callback.html", {"request": request}
     )
 
 

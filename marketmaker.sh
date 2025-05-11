@@ -93,7 +93,17 @@ fi
 
 # 10. 서비스 재시작
 log "서비스 재시작..."
-nohup $PROJECT_DIR/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 > suiboard.log 2>&1 &
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
+    # 윈도우 환경에서는 PowerShell을 사용하여 백그라운드에서 프로세스 시작
+    log "윈도우 환경에서 서비스 시작..."
+    powershell -Command "Start-Process -FilePath 'C:\suiboard\.venv\Scripts\uvicorn.exe' -ArgumentList 'main:app', '--host', '0.0.0.0', '--port', '8000', '--reload' -RedirectStandardOutput '.\suiboard.log' -RedirectStandardError '.\suiboard_error.log' -WindowStyle Hidden"
+    # CMD 대체 방법(PowerShell이 없는 경우)
+    # start /B cmd /c "$PROJECT_DIR\.venv\Scripts\uvicorn.exe main:app --host 0.0.0.0 --port 8000 > $PROJECT_DIR\suiboard.log 2>&1"
+else
+    # 유닉스 계열 환경에서는 nohup으로 백그라운드 실행
+    log "유닉스 환경에서 서비스 시작..."
+    nohup $PROJECT_DIR/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload > suiboard.log 2>&1 &
+fi
 
 # 11. 서비스 상태 확인
 sleep 5
