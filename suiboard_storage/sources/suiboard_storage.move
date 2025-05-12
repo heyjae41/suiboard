@@ -1,5 +1,5 @@
 module suiboard_storage::suiboard_storage {
-    use sui::object::{Self, ID, UID};
+    use sui::object::{Self, UID};
     use sui::dynamic_field::{Self as df};
     use sui::tx_context::{Self, TxContext};
     use std::string::{Self, String};
@@ -7,7 +7,7 @@ module suiboard_storage::suiboard_storage {
     use sui::clock::{Self, Clock}; // Import Clock
 
     /// Represents a single post stored on-chain.
-    public struct Post has store, copy, drop { // Added public
+    struct Post has store, copy, drop {
         id: u64, // Simple ID for the post within this storage
         author: address,
         title: String,
@@ -17,7 +17,7 @@ module suiboard_storage::suiboard_storage {
 
     /// Shared object acting as the central storage for all posts.
     /// Posts will be stored as dynamic fields on this object.
-    public struct BoardStorage has key { // Added public
+    struct BoardStorage has key {
         id: UID,
         post_counter: u64, // Counter to generate unique post IDs
     }
@@ -82,5 +82,4 @@ module suiboard_storage::suiboard_storage {
         let _post: Post = df::remove(&mut storage.id, post_id);
         // The removed Post object is dropped here as it has `drop` ability.
     }
-
 }

@@ -26,3 +26,8 @@ log_config.ini
 uvicorn.log
 log/
 *.log
+.github/
+
+# SUI build directories
+suiboard_token/build/
+suiboard_storage/build/

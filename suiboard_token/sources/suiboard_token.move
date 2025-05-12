@@ -1,10 +1,12 @@
 module suiboard_token::suiboard_token {
     use sui::coin::{Self, Coin, TreasuryCap};
-    // use sui::transfer; // Alias provided by default
-    use sui::tx_context; // Self and TxContext provided by default
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
+    use sui::url;
+    use std::option;
 
     /// The one-time witness for this module.
-    public struct SUIBOARD_TOKEN has drop {}
+    struct SUIBOARD_TOKEN has drop {}
 
     /// Register the SUIBOARD_TOKEN currency to acquire its `TreasuryCap`.
     fun init(witness: SUIBOARD_TOKEN, ctx: &mut TxContext) {
@@ -19,7 +21,7 @@ module suiboard_token::suiboard_token {
             // Description for the token
             b"Token for Suiboard project rewards and activities",
             // Optional URL for the token icon
-            option::some(sui::url::new_unsafe_from_bytes(b"PLACEHOLDER_ICON_URL")), // Placeholder URL
+            option::some(url::new_unsafe_from_bytes(b"https://marketmaker.store/img/logo.png")), // Placeholder URL
             ctx
         );
         // Freeze the metadata object, making it immutable
