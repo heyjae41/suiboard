@@ -1,16 +1,21 @@
 from typing_extensions import List, Annotated
+import logging # Added for logging
 
 from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy import select, exists, delete, update
+from sqlalchemy.orm import Session # Ensure Session is imported for type hinting
 
 from core.database import db_session
-from core.models import Member, BoardNew, Scrap, WriteBaseModel
+from core.models import Member, BoardNew, Scrap, WriteBaseModel, SuiTransactionlog # Import SuiTransactionlog
 from lib.board_lib import is_owner, FileCache
 from lib.common import remove_query_params, set_url_query_params
 from service.board_file_service import BoardFileService
 from service.point_service import PointService
 from .board import BoardService
+from lib.sui_service import reclaim_suiboard_token, SuiInteractionError, DEFAULT_SUI_CONFIG # Import SUI service
+from service.sui_transaction_log_service import log_sui_transaction # Import SUI transaction logging service
 
+logger = logging.getLogger(__name__) # Setup logger
 
 class DeletePostService(BoardService):
     """
@@ -86,69 +91,108 @@ class DeletePostService(BoardService):
          if not self.is_delete_by_comment(self.wr_id):
             self.raise_exception(detail=f"이 글과 관련된 댓글이 {self.board.bo_count_delete}건 이상 존재하므로 삭제 할 수 없습니다.", status_code=403)
 
-    def delete_write(self):
-        """게시글 삭제 처리"""
+    def delete_write(self, sui_config_override: dict = None):
+        """게시글 삭제 처리 및 SUI 토큰 회수"""
         write_model = self.write_model
-        db = self.db
+        db: Session = self.db # type hint for clarity
         bo_table = self.bo_table
         board = self.board
+        original_post_writer_mb_id = self.write.mb_id
+        original_post_wr_id = self.write.wr_id
+
+        # 1. Find the amount of SUI tokens awarded for this post
+        awarded_token_log = db.scalar(
+            select(SuiTransactionlog)
+            .where(
+                SuiTransactionlog.wr_id == original_post_wr_id,
+                SuiTransactionlog.bo_table == bo_table,
+                SuiTransactionlog.stl_status == "success",
+                SuiTransactionlog.stl_reason.like("%게시글 작성 보상%") # Match original award reason
+            )
+            .order_by(SuiTransactionlog.stl_datetime.desc()) # Get the latest one if multiple
+        )
+
+        amount_to_reclaim = 0
+        if awarded_token_log and awarded_token_log.stl_amount > 0:
+            amount_to_reclaim = awarded_token_log.stl_amount
+            logger.info(f"Post {original_post_wr_id} in {bo_table} was awarded {amount_to_reclaim} tokens. Attempting reclaim.")
+        else:
+            logger.info(f"No successful SUI token award found for post {original_post_wr_id} in {bo_table}, or amount is zero. Skipping reclaim.")
 
         # 원글 + 댓글
         delete_write_count = 0
         delete_comment_count = 0
         writes: List[WriteBaseModel] = db.scalars(
             select(write_model)
-            .filter_by(wr_parent=self.wr_id)
+            .filter_by(wr_parent=original_post_wr_id)
             .order_by(write_model.wr_id)
         ).all()
-        for write in writes:
-            # 원글 삭제
-            if not write.wr_is_comment:
-                # 원글 포인트 삭제
-                if not self.point_service.delete_point(write.mb_id, bo_table, self.wr_id, "쓰기"):
-                    self.point_service.save_point(write.mb_id, board.bo_write_point * (-1),
-                                                    f"{board.bo_subject} {self.wr_id} 글 삭제")
-                # 파일+섬네일 삭제
-                self.file_service.delete_board_files(board.bo_table, self.wr_id)
-
+        for write_item in writes:
+            if not write_item.wr_is_comment:
+                if not self.point_service.delete_point(write_item.mb_id, bo_table, original_post_wr_id, "쓰기"):
+                    self.point_service.save_point(write_item.mb_id, board.bo_write_point * (-1),
+                                                    f"{board.bo_subject} {original_post_wr_id} 글 삭제")
+                self.file_service.delete_board_files(board.bo_table, original_post_wr_id)
                 delete_write_count += 1
-                # TODO: 에디터 섬네일 삭제
             else:
-                # 댓글 포인트 삭제
-                if not self.point_service.delete_point(write.mb_id, bo_table, self.wr_id, "댓글"):
-                    self.point_service.save_point(self.request, write.mb_id, board.bo_comment_point * (-1),
-                                                  f"{board.bo_subject} {self.wr_id} 댓글 삭제")
-
+                if not self.point_service.delete_point(write_item.mb_id, bo_table, original_post_wr_id, "댓글"):
+                    self.point_service.save_point(self.request, write_item.mb_id, board.bo_comment_point * (-1),
+                                                  f"{board.bo_subject} {original_post_wr_id} 댓글 삭제")
                 delete_comment_count += 1
 
-        # 원글+댓글 삭제
-        db.execute(delete(write_model).filter_by(wr_parent=self.wr_id))
-
-        # 최근 게시물 삭제
-        db.execute(delete(BoardNew).where(
-            BoardNew.bo_table == bo_table,
-            BoardNew.wr_parent == self.wr_id
-        ))
-
-        # 스크랩 삭제
-        db.execute(delete(Scrap).filter_by(
-            bo_table=bo_table,
-            wr_id=self.wr_id
-        ))
-
-        # 공지사항 삭제
-        board.bo_notice = self.set_board_notice(self.wr_id, False)
-
-        # 게시글 갯수 업데이트
+        db.execute(delete(write_model).filter_by(wr_parent=original_post_wr_id))
+        db.execute(delete(BoardNew).where(BoardNew.bo_table == bo_table, BoardNew.wr_parent == original_post_wr_id))
+        db.execute(delete(Scrap).filter_by(bo_table=bo_table, wr_id=original_post_wr_id))
+        board.bo_notice = self.set_board_notice(original_post_wr_id, False)
         board.bo_count_write -= delete_write_count
         board.bo_count_comment -= delete_comment_count
 
+        # 2. Attempt to reclaim SUI tokens if an award was found
+        if amount_to_reclaim > 0 and original_post_writer_mb_id:
+            logger.info(f"Attempting to reclaim {amount_to_reclaim} SUI tokens for deleted post {original_post_wr_id}.")
+            current_sui_config = DEFAULT_SUI_CONFIG.copy()
+            if sui_config_override:
+                current_sui_config.update(sui_config_override)
+
+            reclaim_tx_digest = None
+            reclaim_status = "failed"
+            reclaim_error_msg = None
+            try:
+                reclaim_tx_digest = reclaim_suiboard_token(
+                    amount_to_reclaim=amount_to_reclaim,
+                    sui_config=current_sui_config
+                )
+                reclaim_status = "success"
+                logger.info(f"SUI token reclaim successful for deleted post {original_post_wr_id}. TX Digest: {reclaim_tx_digest}")
+            except SuiInteractionError as e:
+                reclaim_error_msg = str(e)
+                logger.error(f"SUI token reclaim failed for deleted post {original_post_wr_id}. Error: {reclaim_error_msg}")
+            except ValueError as e: # From sui_config validation
+                reclaim_error_msg = str(e)
+                logger.error(f"SUI configuration error during token reclaim for post {original_post_wr_id}. Error: {reclaim_error_msg}")
+            except Exception as e:
+                reclaim_error_msg = f"Unexpected error during SUI token reclaim: {str(e)}"
+                logger.error(f"{reclaim_error_msg} for post {original_post_wr_id}")
+            
+            # Log the reclaim transaction attempt to DB
+            log_sui_transaction(
+                db=db,
+                mb_id=original_post_writer_mb_id, # Log against the original post writer
+                wr_id=original_post_wr_id,
+                bo_table=bo_table,
+                stl_amount=-amount_to_reclaim, # Log reclaimed amount as negative
+                stl_tx_hash=reclaim_tx_digest,
+                stl_status=reclaim_status,
+                stl_reason="게시글 삭제로 인한 토큰 회수",
+                stl_error_message=reclaim_error_msg
+            )
+        
         db.commit()
-        db.close()
+        # db.close() # Closing session here might be premature if called from a larger transaction context
 
-        # 최신글 캐시 삭제
-        FileCache().delete_prefix(f'latest-{bo_table}')
+        FileCache().delete_prefix(f"latest-{bo_table}")
 
+# ... (rest of the file: DeleteCommentService, ListDeleteService remains the same) ...
 
 class DeleteCommentService(DeletePostService):
     """댓글 삭제 처리 클래스"""
@@ -162,8 +206,9 @@ class DeleteCommentService(DeletePostService):
         bo_table: Annotated[str, Path(...)],
         comment_id: Annotated[str, Path(...)],
     ):
-        super().__init__(request, db, file_service, point_service, bo_table, comment_id)
-        self.wr_id = comment_id
+        # Note: We are calling the parent constructor with comment_id as wr_id
+        super().__init__(request, db, file_service, point_service, bo_table, int(comment_id) if comment_id.isdigit() else 0 )
+        self.wr_id = int(comment_id) if comment_id.isdigit() else 0 # Ensure wr_id is int for comment
         self.comment = self.get_comment()
 
     @classmethod
@@ -199,14 +244,9 @@ class DeleteCommentService(DeletePostService):
         if self.member.admin_type:
             return
 
-        # 익명 댓글
         if not self.comment.mb_id:
-
-            # API 요청일때
             if not with_session:
                 self.raise_exception(detail="삭제할 권한이 없습니다.", status_code=403)
-
-            # 템플릿 요청일때
             session_name = f"ss_delete_comment_{self.bo_table}_{self.wr_id}"
             if self.request.session.get(session_name):
                 return
@@ -214,31 +254,31 @@ class DeleteCommentService(DeletePostService):
             query_params = remove_query_params(self.request, "token")
             self.raise_exception(detail="삭제할 권한이 없습니다.", status_code=403, url=set_url_query_params(url, query_params))
 
-        # 회원 댓글
         if not is_owner(self.comment, self.member.mb_id):
             self.raise_exception(detail="자신의 댓글만 삭제할 수 있습니다.", status_code=403)
 
     def delete_comment(self):
         """댓글 삭제 처리"""
         write_model= self.write_model
+        db = self.db
 
-        # 댓글 삭제
-        self.db.delete(self.comment)
+        # 댓글 포인트 회수 (SUI 토큰 회수는 댓글에 대해선 현재 미구현)
+        if self.comment.mb_id and self.board.bo_comment_point:
+            if not self.point_service.delete_point(self.comment.mb_id, self.bo_table, self.comment.wr_id, "댓글"):
+                self.point_service.save_point(self.request, self.comment.mb_id, self.board.bo_comment_point * (-1),
+                                                f"{self.board.bo_subject} {self.comment.wr_id} 댓글 삭제")
 
-        # 게시글에 댓글 수 감소
-        self.db.execute(
+        db.delete(self.comment)
+        db.execute(
             update(write_model).values(wr_comment=write_model.wr_comment - 1)
             .where(write_model.wr_id == self.comment.wr_parent)
         )
-
-        self.db.commit()
-
+        db.commit()
 
 class ListDeleteService(BoardService):
     """
     여러 게시글을 한번에 삭제하기 위한 클래스
     """
-
     def __init__(
         self,
         request: Request,
@@ -263,27 +303,86 @@ class ListDeleteService(BoardService):
         instance = cls(request, db, file_service, point_service, bo_table)
         return instance
 
-    def delete_writes(self, wr_ids: list):
-        """게시글 목록 삭제"""
+    def delete_writes(self, wr_ids: list, sui_config_override: dict = None):
+        """게시글 목록 삭제 및 SUI 토큰 회수"""
         write_model = self.write_model
-        writes: List[WriteBaseModel] = self.db.scalars(
-            select(write_model)
-            .where(write_model.wr_id.in_(wr_ids))
-        ).all()
-        for write in writes:
-            self.db.delete(write)
-            # 원글 포인트 삭제
-            if not self.point_service.delete_point(write.mb_id, self.bo_table, write.wr_id, "쓰기"):
-                self.point_service.save_point(write.mb_id, self.board.bo_write_point * (-1),
-                                              f"{self.board.bo_subject} {write.wr_id} 글 삭제")
+        db: Session = self.db
 
-            # 파일 삭제
-            self.file_service.delete_board_files(self.board.bo_table, write.wr_id)
+        for wr_id_to_delete in wr_ids:
+            write_to_delete = db.get(write_model, wr_id_to_delete)
+            if not write_to_delete:
+                logger.warning(f"Attempted to delete non-existent write ID: {wr_id_to_delete} in bo_table: {self.bo_table}")
+                continue
+            
+            original_writer_mb_id = write_to_delete.mb_id
 
-            # TODO: 댓글 삭제
-        self.db.commit()
+            # 1. Find awarded tokens for this specific post
+            awarded_token_log_list_delete = db.scalar(
+                select(SuiTransactionlog)
+                .where(
+                    SuiTransactionlog.wr_id == wr_id_to_delete,
+                    SuiTransactionlog.bo_table == self.bo_table,
+                    SuiTransactionlog.stl_status == "success",
+                    SuiTransactionlog.stl_reason.like("%게시글 작성 보상%")
+                )
+                .order_by(SuiTransactionlog.stl_datetime.desc())
+            )
+            amount_to_reclaim_list_delete = 0
+            if awarded_token_log_list_delete and awarded_token_log_list_delete.stl_amount > 0:
+                amount_to_reclaim_list_delete = awarded_token_log_list_delete.stl_amount
+            
+            # Delete comments associated with this post first (simplified, actual comment deletion might be more complex)
+            # This part might need more robust handling if comments also award points/tokens that need reclaiming
+            db.execute(delete(write_model).where(write_model.wr_parent == wr_id_to_delete, write_model.wr_is_comment == 1))
 
-        # 최신글 캐시 삭제
-        FileCache().delete_prefix(f'latest-{self.bo_table}')
+            # Delete the post itself
+            db.delete(write_to_delete)
+            if not self.point_service.delete_point(original_writer_mb_id, self.bo_table, wr_id_to_delete, "쓰기"):
+                self.point_service.save_point(original_writer_mb_id, self.board.bo_write_point * (-1),
+                                              f"{self.board.bo_subject} {wr_id_to_delete} 글 삭제")
+            self.file_service.delete_board_files(self.board.bo_table, wr_id_to_delete)
+            
+            # Update board counts (simplified for list delete)
+            self.board.bo_count_write -= 1 # Decrement for each main post deleted
+            # Comment count update would be more complex here, assuming comments are deleted above
 
-        # TODO: 게시글 삭제시 같이 삭제해야할 것들 추가
+            # Reclaim SUI tokens
+            if amount_to_reclaim_list_delete > 0 and original_writer_mb_id:
+                logger.info(f"Attempting to reclaim {amount_to_reclaim_list_delete} SUI tokens for list-deleted post {wr_id_to_delete}.")
+                current_sui_config_list = DEFAULT_SUI_CONFIG.copy()
+                if sui_config_override:
+                    current_sui_config_list.update(sui_config_override)
+                
+                reclaim_tx_digest_list = None
+                reclaim_status_list = "failed"
+                reclaim_error_msg_list = None
+                try:
+                    reclaim_tx_digest_list = reclaim_suiboard_token(
+                        amount_to_reclaim=amount_to_reclaim_list_delete,
+                        sui_config=current_sui_config_list
+                    )
+                    reclaim_status_list = "success"
+                except SuiInteractionError as e:
+                    reclaim_error_msg_list = str(e)
+                except Exception as e:
+                    reclaim_error_msg_list = f"Unexpected SUI error: {str(e)}"
+                
+                log_sui_transaction(
+                    db=db,
+                    mb_id=original_writer_mb_id,
+                    wr_id=wr_id_to_delete,
+                    bo_table=self.bo_table,
+                    stl_amount=-amount_to_reclaim_list_delete,
+                    stl_tx_hash=reclaim_tx_digest_list,
+                    stl_status=reclaim_status_list,
+                    stl_reason="목록 삭제로 인한 토큰 회수",
+                    stl_error_message=reclaim_error_msg_list
+                )
+
+            # Remove from BoardNew and Scrap
+            db.execute(delete(BoardNew).where(BoardNew.bo_table == self.bo_table, BoardNew.wr_id == wr_id_to_delete))
+            db.execute(delete(Scrap).where(Scrap.bo_table == self.bo_table, Scrap.wr_id == wr_id_to_delete))
+
+        db.commit()
+        FileCache().delete_prefix(f"latest-{self.bo_table}")
+

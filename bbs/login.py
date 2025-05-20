@@ -4,6 +4,7 @@ from typing_extensions import Annotated
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import RedirectResponse
 
+from core.database import db_session # Added for SuiTokenService
 from core.template import UserTemplates
 from lib.common import session_member_key
 from lib.dependency.dependencies import set_current_connect, validate_login_url
@@ -11,6 +12,7 @@ from lib.member import is_super_admin
 from lib.social import providers
 from lib.social.social import SocialProvider, oauth
 from service.member_service import MemberService
+from service.sui_token_service import SuiTokenService # Added for login token award
 
 router = APIRouter(prefix="/bbs",
                    tags=["login"],
@@ -35,7 +37,9 @@ async def login_form(
 @router.post("/login")
 async def login(
         request: Request,
+        db: db_session, # Added for SuiTokenService
         member_service: Annotated[MemberService, Depends()],
+        sui_token_service: Annotated[SuiTokenService, Depends(SuiTokenService.async_init)], # Added
         url: Annotated[str, Depends(validate_login_url)],
         mb_id: str = Form(...),
         mb_password: str = Form(...),
@@ -49,10 +53,20 @@ async def login(
     ss_mb_key = session_member_key(request, member)
     request.session["ss_mb_key"] = ss_mb_key
 
+    # 로그인 성공 시 SUIBOARD 토큰 지급 (1일 1회, 2토큰)
+    try:
+        if member:
+            print(f"Attempting to award login tokens to {member.mb_id}")
+            await sui_token_service.award_login_tokens(member, amount=2)
+            print(f"Login token award process completed for {member.mb_id}")
+    except Exception as e:
+        print(f"Error awarding login tokens to {member.mb_id}: {e}")
+        # Log a more detailed error if necessary, but don't let it break the login flow
+
     # 자동로그인
     response = RedirectResponse(url=url, status_code=302)
     # 최고관리자는 보안상 자동로그인 기능을 사용하지 않는다.
-    if auto_login and not is_super_admin(request):
+    if auto_login and not is_super_admin(request, member.mb_id):
         age_1day = 60 * 60 * 24
         cookie_domain = request.state.cookie_domain
         response.set_cookie(key="ck_mb_id", value=member.mb_id,
@@ -99,3 +113,4 @@ async def logout(request: Request):
         response.delete_cookie(key="ck_mb_id")
 
     return response
+

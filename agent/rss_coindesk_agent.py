@@ -1,274 +1,168 @@
+# /home/ubuntu/suiboard_project_v3/agent/rss_coindesk_agent.py
 import feedparser
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage
-from datetime import datetime
-from dotenv import load_dotenv
-import time
-import json
-import schedule
-from board_rest_api import post_to_board
+import datetime
+import os
+import sys
+from bs4 import BeautifulSoup # To clean up HTML content from RSS summary
 
+# Add project root to sys.path to allow importing project modules
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(PROJECT_ROOT)
 
-def get_openai_client():
-    """OpenAI 클라이언트 초기화"""
-    llm = ChatOpenAI(
-        temperature=0.1,
-        max_tokens=4000,  # 응답에 사용할 최대 토큰 수 (입력 토큰 제외)
-        model_name="gpt-4o",
-    )
-    return llm
+from sqlalchemy.orm import Session
+from core.database import SessionLocal # Assuming SessionLocal is your session factory
+from service.agent_service import create_post_by_agent
+from core.models import Member, Board # To check/create agent member and board
 
+# Configuration
+COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+BOARD_TABLE_NAME = "blockchain"  # Target board table (bo_table)
+AGENT_MEMBER_ID = "AINewsAgent" # Member ID for the agent
+AGENT_MEMBER_NICKNAME = "AINewsAgent"
 
-def translate_and_summarize_article(
-    client: ChatOpenAI, title: str, content: str
-) -> dict:
-    """기사 번역 및 요약"""
-    # 영어 제목과 내용을 한글로 번역
-    translation_prompt = f"Translate the following English text to Korean:\n\nTitle: {title}\n\nContent: {content}"
-    translation_response = client.invoke([HumanMessage(content=translation_prompt)])
-    translated_text = translation_response.content.strip()
-
-    # 번역된 텍스트에서 제목과 내용 분리
+# --- Database Setup --- #
+def get_db():
+    db = SessionLocal()
     try:
-        # 먼저 "Title:" 과 "Content:" 로 구분해보기
-        parts = translated_text.split("Content:")
-        if len(parts) == 2:
-            translated_title = parts[0].replace("Title:", "").strip()
-            translated_content = parts[1].strip()
-        else:
-            # 실패하면 첫 줄을 제목으로, 나머지를 내용으로
-            lines = translated_text.split("\n")
-            translated_title = lines[0].strip()
-            translated_content = "\n".join(lines[1:]).strip()
+        yield db
+    finally:
+        db.close()
 
-        # 내용이 비어있으면 제목을 내용으로 사용
-        if not translated_content:
-            translated_content = translated_title
+# --- Helper function to ensure agent member and board exist --- #
+def ensure_agent_setup(db: Session):
+    # 1. Ensure agent member exists
+    agent_member = db.query(Member).filter(Member.mb_id == AGENT_MEMBER_ID).first()
+    if not agent_member:
+        print(f"Agent member {AGENT_MEMBER_ID} not found. Creating...")
+        new_agent = Member(
+            mb_id=AGENT_MEMBER_ID,
+            mb_password="!impossible_password_hash", 
+            mb_name=AGENT_MEMBER_NICKNAME,
+            mb_nick=AGENT_MEMBER_NICKNAME,
+            mb_email=f"{AGENT_MEMBER_ID}@example.com",
+            mb_level=2, 
+            mb_mailling=0,
+            mb_open=0,
+            mb_email_certify=datetime.datetime.now(),
+            mb_datetime=datetime.datetime.now(),
+            mb_ip = "0.0.0.0",
+            mb_leave_date = "",
+            mb_intercept_date = "",
+            mb_memo_call = "",
+            mb_sui_address = ""
+        )
+        db.add(new_agent)
+        db.commit()
+        print(f"Agent member {AGENT_MEMBER_ID} created.")
+    else:
+        print(f"Agent member {AGENT_MEMBER_ID} found.")
 
-        # '제목: '과 '내용: ' 접두어 제거
-        translated_title = translated_title.replace("제목: ", "").strip()
-        translated_content = translated_content.replace("내용: ", "").strip()
+    # 2. Ensure target board exists (assuming it should be pre-created by an admin)
+    target_board = db.query(Board).filter(Board.bo_table == BOARD_TABLE_NAME).first()
+    if not target_board:
+        print(f"Error: Board \'{BOARD_TABLE_NAME}\' not found. Please create it manually.")
+        # Depending on policy, could raise an error or attempt to create a basic board.
+        # For now, we let create_post_by_agent handle the board not found error if it occurs.
+        pass
+    else:
+        print(f"Target board \'{BOARD_TABLE_NAME}\' found.")
 
-        return {
-            "title": translated_title,
-            "content": translated_content,
-        }
-
-    except Exception as e:
-        print(f"텍스트 파싱 중 오류 발생: {str(e)}")
-        return {
-            "title": title,  # 오류 발생시 원본 제목 사용
-            "content": translated_text,  # 전체 번역 텍스트를 내용으로 사용
-        }
-
-
-def process_rss_feed(rss_url: str) -> list:
-    """RSS 피드 처리"""
-    client = get_openai_client()
+# --- RSS Parsing Logic --- #
+def parse_coindesk_rss():
     articles = []
+    try:
+        feed = feedparser.parse(COINDESK_RSS_URL)
+        if feed.bozo:
+            print(f"Warning: RSS feed is ill-formed. Bozo exception: {feed.bozo_exception}")
 
-    # RSS 피드 파싱
-    feed = feedparser.parse(rss_url)
-
-    # 현재 시각을 UTC로 변환
-    current_time = datetime.utcnow()
-
-    for entry in feed.entries:
-        try:
-            # print(entry)
-            # 글 작성 시각 파싱 (RSS의 시간은 이미 UTC)
-            try:
-                # timezone 정보가 있는 경우
-                pub_date = datetime.strptime(
-                    entry.published, "%a, %d %b %Y %H:%M:%S %z"
-                )
-            except ValueError:
-                try:
-                    # timezone 정보가 없는 경우
-                    pub_date = datetime.strptime(
-                        entry.published, "%a, %d %b %Y %H:%M:%S"
-                    )
-                except ValueError:
-                    try:
-                        # ISO 형식 시도
-                        pub_date = datetime.fromisoformat(
-                            entry.published.replace("Z", "+00:00")
-                        )
-                    except ValueError as e:
-                        print(f"날짜 파싱 오류: {str(e)} - {entry.published}")
-                        continue
-
-            # print(pub_date)
-            pub_date = pub_date.astimezone().replace(
-                tzinfo=None
-            )  # UTC로 변환 후 timezone 정보 제거
-
-            # 현재 시각과의 차이 계산 (시간 단위)
-            time_diff = (current_time - pub_date).total_seconds() / 3600
-
-            # 1시간 이상 지난 글은 건너뛰기
-            if time_diff > 1:
-                continue
-
-            # 기사 제목
-            title = entry.title
-
-            # 기사 내용 가져오기 (content:encoded 태그 내용 우선)
-            content = ""
-            if "content" in entry and entry.content:
-                # HTML 콘텐츠 찾기 (type이 'text/html'인 항목)
-                for content_item in entry.content:
-                    if content_item.get("type") == "text/html":
-                        content = content_item.value
-                        break
-                # HTML 콘텐츠가 없으면 첫 번째 콘텐츠 사용
-                if not content and entry.content:
-                    content = entry.content[0].value
-            elif "content_encoded" in entry:
-                content = entry.content_encoded
-            else:
-                content = entry.get("description", "")
-
-            # HTML 태그 제거 (선택적)
-            # content = content.replace("<p>", "\n").replace("</p>", "\n")
-            # content = content.replace("<h1>", "\n").replace("</h1>", "\n")
-            # content = content.replace("<h4>", "\n").replace("</h4>", "\n")
-            # content = content.replace("<br>", "\n").replace("<br/>", "\n")
-            # content = content.replace("</div>", "\n").replace("</section>", "\n")
-
-            # 링크 태그 처리
-            # while "<a href=" in content:
-            #     start = content.find("<a href=")
-            #     end = content.find("</a>", start) + 4
-            #     if end > 4:  # </a>를 찾았을 경우
-            #         link_text = content[start:end]
-            #         # 링크 텍스트만 추출
-            #         text_start = link_text.find(">")
-            #         if text_start != -1:
-            #             text = link_text[text_start + 1 : link_text.find("</a>")]
-            #             content = content.replace(link_text, text)
-            #     else:
-            #         break  # 무한루프 방지
-
-            # 연속된 빈 줄 제거
-            while "\n\n\n" in content:
-                content = content.replace("\n\n\n", "\n\n")
-
-            content = content.strip()
-
-            # 대표 이미지 URL 가져오기
-            image_url = ""
-            if "media_content" in entry and entry.media_content:
-                image_url = entry.media_content[0]["url"]
-
-            # 기사 번역 및 요약
-            article = translate_and_summarize_article(client, title, content)
-            if article:
-                articles.append(article)
-
-                # 게시판 데이터에 이미지 URL 추가
-                article_data = {
-                    "title": article["title"],
-                    "content": (
-                        f'<p><img src="{image_url}" width="1280"></p>\n\n{article["content"]}'
-                        if image_url
-                        else article["content"]
-                    ),
-                    "ca_name": "blockchain",
-                }
-
-                # 번역된 기사를 게시판에 작성
-                if not post_to_board(article_data):
-                    print(f"게시글 작성 실패: {article['title']}")
-                time.sleep(60)  # 요청 간격을 1분으로 늘림
-
-        except Exception as e:
-            print(f"기사 처리 중 오류 발생: {str(e)}")
-            continue
-
+        for entry in feed.entries[:5]: # Get top 5 entries
+            title = entry.get("title", "No Title")
+            link = entry.get("link", "")
+            
+            # Content: feedparser provides entry.summary or entry.content
+            # Coindesk RSS usually has summary_detail (with HTML) or summary.
+            content_html = ""
+            if hasattr(entry, "summary_detail") and entry.summary_detail:
+                content_html = entry.summary_detail.get("value", "")
+            elif hasattr(entry, "summary"):
+                content_html = entry.summary
+            
+            # Clean HTML from content if needed, or use it as html1 content
+            # For simplicity, let's extract text, but keep some basic structure if possible.
+            # Using BeautifulSoup to get cleaner text from HTML summary
+            soup = BeautifulSoup(content_html, "html.parser")
+            content_text = soup.get_text(separator="\n", strip=True)
+            if not content_text: # Fallback if text extraction is empty
+                content_text = title # Use title if content is blank
+            
+            # Published date
+            published_time = None
+            if hasattr(entry, "published_parsed") and entry.published_parsed:
+                published_time = datetime.datetime(*entry.published_parsed[:6])
+            elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
+                 published_time = datetime.datetime(*entry.updated_parsed[:6])
+            
+            articles.append({
+                "title": title,
+                "link": link,
+                "content": content_text, # Use cleaned text content
+                "published_date": published_time
+            })
+            print(f"Parsed from RSS: {title}")
+            
+    except Exception as e:
+        print(f"An error occurred during RSS parsing: {e}")
+    
     return articles
 
-
-def run_news_collector():
-    """뉴스 수집 작업 실행"""
-    try:
-        # 시작 시간 기록
-        start_time = time.time()
-        start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"\n뉴스 수집 작업 시작 시간: {start_datetime}")
-
-        # RSS 피드 처리
-        rss_url = "https://www.coindesk.com/arc/outboundfeeds/rss"
-        articles = process_rss_feed(rss_url)
-
-        # 종료 시간 기록
-        end_time = time.time()
-        end_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        elapsed_time = end_time - start_time
-
-        # 결과 출력
-        print(json.dumps(articles, ensure_ascii=False, indent=2))
-
-        # 시간 정보 출력
-        print(f"\n뉴스 수집 작업 종료 시간: {end_datetime}")
-        print(f"뉴스 수집 작업 총 소요 시간: {elapsed_time:.2f}초")
-
-    except Exception as e:
-        print(f"오류 발생: {str(e)}")
-        print("다음 예약된 실행을 기다립니다.")
-
-
-def main():
-    """메인 함수"""
-    load_dotenv()
-
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 뉴스 수집 에이전트가 시작되었습니다."
-    )
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 매 시간 5분에 뉴스를 수집합니다."
-    )
-
-    # 매 시간 5분에 실행되도록 스케줄 설정
-    job = schedule.every().hour.at(":05").do(run_news_collector)
-    next_run = schedule.next_run()
-    if next_run:
-        print(
-            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-    else:
-        print(
-            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
-        )
-
-    # 프로그램 시작 시 즉시 한 번 실행
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 시작")
-    run_news_collector()
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 초기 실행 완료")
-
-    try:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 스케줄러 루프 시작")
-        while True:
-            schedule.run_pending()
-
-            # 매 10분마다 스케줄러 상태 로깅
-            if datetime.now().minute % 10 == 0 and datetime.now().second == 0:
-                next_run = schedule.next_run()
-                if next_run:
-                    print(
-                        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 다음 예정된 실행 시간: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
-                else:
-                    print(
-                        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 경고: 다음 실행 시간을 가져올 수 없습니다."
-                    )
-
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print(
-            f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 프로그램이 사용자에 의해 중단되었습니다."
-        )
-
-
+# --- Main Agent Logic --- #
 if __name__ == "__main__":
-    main()
+    print(f"Starting Coindesk RSS Agent at {datetime.datetime.now()}...")
+    db_session_gen = get_db()
+    db = next(db_session_gen)
+
+    try:
+        ensure_agent_setup(db) # Ensure agent member and board (check) are ready
+        
+        parsed_articles = parse_coindesk_rss()
+        
+        if not parsed_articles:
+            print("No articles parsed from RSS. Exiting.")
+        else:
+            print(f"Successfully parsed {len(parsed_articles)} articles. Posting to board \'{BOARD_TABLE_NAME}\'...")
+
+        for article_data in parsed_articles:
+            try:
+                # Check for duplicates (e.g., by wr_link1) before posting is recommended.
+                # This check is omitted for brevity here.
+                
+                print(f"Posting article: {article_data["title"]}")
+                
+                # Prepare content. If original content was HTML and you want to keep it:
+                # wr_option="html1", and pass the HTML content to wr_content.
+                # For now, using the extracted text content.
+                new_post = create_post_by_agent(
+                    db=db,
+                    bo_table=BOARD_TABLE_NAME,
+                    mb_id=AGENT_MEMBER_ID,
+                    wr_subject=article_data["title"],
+                    wr_content=article_data["content"],
+                    wr_link1=article_data["link"],
+                    wr_name=AGENT_MEMBER_NICKNAME,
+                    # wr_option="html1", # Uncomment if content is HTML and should be rendered as such
+                    wr_ip = "127.0.0.1" # Placeholder IP for agent
+                )
+                print(f"Successfully posted article ID: {new_post.wr_id}, Title: {new_post.wr_subject}")
+                # Point and SUI token logic is handled within create_post_by_agent / insert_point
+
+            except Exception as e:
+                print(f"Error posting article \'{article_data["title"]}\' from RSS: {e}")
+                # Log this error
+    
+    except Exception as e:
+        print(f"An error occurred in the Coindesk agent's main loop: {e}")
+
+    finally:
+        print(f"Coindesk RSS Agent finished at {datetime.datetime.now()}.")
+        db.close()
+

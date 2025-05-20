@@ -1216,3 +1216,25 @@ class Login(Base):
     lo_datetime = Column(DateTime, nullable=False, default=func.now())
     lo_location = Column(Text, nullable=False)
     lo_url = Column(Text, nullable=False)
+
+
+
+class SuiTransactionlog(Base):
+    __tablename__ = DB_TABLE_PREFIX + "sui_transaction_log"
+
+    stl_id = Column(Integer, primary_key=True, autoincrement=True)
+    mb_id = Column(String(20), ForeignKey(DB_TABLE_PREFIX + "member.mb_id"), nullable=False, index=True)
+    wr_id = Column(Integer, nullable=True, index=True) # Can be null if not related to a specific post (e.g., login bonus)
+    bo_table = Column(String(20), nullable=True, index=True) # Board table, can be null
+    stl_amount = Column(BIGINT, nullable=False) # Amount in smallest unit
+    stl_tx_hash = Column(String(255), nullable=True, unique=True) # SUI Transaction Hash, can be null if TX failed before submission
+    stl_status = Column(String(20), nullable=False)  # e.g., "success", "failed"
+    stl_reason = Column(String(255), nullable=True) # e.g., "게시글 작성 보상", "로그인 보상"
+    stl_datetime = Column(DateTime, nullable=False, default=func.now())
+    stl_error_message = Column(Text, nullable=True) # Store error message if status is "failed"
+
+    member = relationship("Member", backref="sui_transaction_logs")
+    # If wr_id and bo_table are to be foreign keys to a generic WriteModel, 
+    # it might require a more complex setup or separate FKs per board table if not using a unified WriteModel.
+    # For simplicity, keeping wr_id and bo_table as indexed fields for now.
+
