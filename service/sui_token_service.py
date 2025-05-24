@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from fastapi import Request
 
 from core.database import db_session
-from core.models import Member, SuiTokenLog # Assuming SuiTokenLog model exists in core.models
+from core.models import Member, SuiTransactionlog # Using SuiTransactionlog model
 # from lib.sui_integration import transfer_suiboard_tokens # Placeholder for actual SUI transfer function
 
 class SuiTokenService:
@@ -36,10 +36,10 @@ class SuiTokenService:
         # Check if tokens were already awarded today for login
         today = datetime.date.today()
         existing_log = self.db.scalar(
-            select(SuiTokenLog).where(
-                SuiTokenLog.mb_id == member.mb_id,
-                SuiTokenLog.stl_reason == "login_bonus",
-                func.date(SuiTokenLog.stl_datetime) == today
+            select(SuiTransactionlog).where(
+                SuiTransactionlog.mb_id == member.mb_id,
+                SuiTransactionlog.stl_reason == "login_bonus",
+                func.date(SuiTransactionlog.stl_datetime) == today
             ).limit(1)
         )
 
@@ -58,13 +58,16 @@ class SuiTokenService:
         if sui_transfer_successful:
             print(f"SuiTokenService: Simulated SUI token transfer successful. TxHash: {simulated_tx_hash}")
             try:
-                new_token_log = SuiTokenLog(
+                new_token_log = SuiTransactionlog(
                     mb_id=member.mb_id,
+                    wr_id=None,  # No post associated with login bonus
+                    bo_table=None,  # No board associated with login bonus
                     stl_amount=amount,
                     stl_reason="login_bonus",
                     stl_tx_hash=simulated_tx_hash,
-                    stl_ip=self.request.client.host if self.request.client else "",
-                    stl_datetime=datetime.datetime.now()
+                    stl_status="success",
+                    stl_datetime=datetime.datetime.now(),
+                    stl_error_message=None
                 )
                 self.db.add(new_token_log)
                 self.db.commit()

@@ -21,7 +21,7 @@ import os
 import platform
 
 # 배포된 패키지 및 객체 ID 상수 (실제 ID로 대체해야 함)
-SUI_BIN_PATH = "/home/ubuntu/sui_bin"  # SUI 바이너리 실행 파일 경로
+SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"  # SUI 바이너리 실행 파일 경로
 TOKEN_PACKAGE_ID = "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165"  # 토큰 컨트랙트 패키지 ID (2023-05-10 업데이트)
 TOKEN_TREASURY_CAP_ID = "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59"  # 토큰 관리 권한 객체 ID (2023-05-10 업데이트)
 STORAGE_PACKAGE_ID = "0x1fad2576bf6359f0fafc8c089723c80fed4784f5e3ee508b037c5280f91e543f"  # 스토리지 컨트랙트 패키지 ID (2023-05-10 업데이트)

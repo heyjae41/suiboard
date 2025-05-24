@@ -10,7 +10,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(PROJECT_ROOT)
 
 from sqlalchemy.orm import Session
-from core.database import SessionLocal # Assuming SessionLocal is your session factory
+from core.database import db_connect
 from service.agent_service import create_post_by_agent
 from core.models import Member, Board # To check/create agent member and board
 
@@ -22,7 +22,7 @@ AGENT_MEMBER_NICKNAME = "AINewsAgent"
 
 # --- Database Setup --- #
 def get_db():
-    db = SessionLocal()
+    db = db_connect.sessionLocal()
     try:
         yield db
     finally:
@@ -60,12 +60,12 @@ def ensure_agent_setup(db: Session):
     # 2. Ensure target board exists (assuming it should be pre-created by an admin)
     target_board = db.query(Board).filter(Board.bo_table == BOARD_TABLE_NAME).first()
     if not target_board:
-        print(f"Error: Board \'{BOARD_TABLE_NAME}\' not found. Please create it manually.")
+        print(f"Error: Board '{BOARD_TABLE_NAME}' not found. Please create it manually.")
         # Depending on policy, could raise an error or attempt to create a basic board.
         # For now, we let create_post_by_agent handle the board not found error if it occurs.
         pass
     else:
-        print(f"Target board \'{BOARD_TABLE_NAME}\' found.")
+        print(f"Target board '{BOARD_TABLE_NAME}' found.")
 
 # --- RSS Parsing Logic --- #
 def parse_coindesk_rss():
@@ -129,14 +129,15 @@ if __name__ == "__main__":
         if not parsed_articles:
             print("No articles parsed from RSS. Exiting.")
         else:
-            print(f"Successfully parsed {len(parsed_articles)} articles. Posting to board \'{BOARD_TABLE_NAME}\'...")
+            print(f"Successfully parsed {len(parsed_articles)} articles. Posting to board '{BOARD_TABLE_NAME}'...")
 
         for article_data in parsed_articles:
             try:
                 # Check for duplicates (e.g., by wr_link1) before posting is recommended.
                 # This check is omitted for brevity here.
                 
-                print(f"Posting article: {article_data["title"]}")
+                article_title = article_data['title']
+                print(f"Posting article: {article_title}")
                 
                 # Prepare content. If original content was HTML and you want to keep it:
                 # wr_option="html1", and pass the HTML content to wr_content.
@@ -145,9 +146,9 @@ if __name__ == "__main__":
                     db=db,
                     bo_table=BOARD_TABLE_NAME,
                     mb_id=AGENT_MEMBER_ID,
-                    wr_subject=article_data["title"],
-                    wr_content=article_data["content"],
-                    wr_link1=article_data["link"],
+                    wr_subject=article_data['title'],
+                    wr_content=article_data['content'],
+                    wr_link1=article_data['link'],
                     wr_name=AGENT_MEMBER_NICKNAME,
                     # wr_option="html1", # Uncomment if content is HTML and should be rendered as such
                     wr_ip = "127.0.0.1" # Placeholder IP for agent
@@ -156,7 +157,8 @@ if __name__ == "__main__":
                 # Point and SUI token logic is handled within create_post_by_agent / insert_point
 
             except Exception as e:
-                print(f"Error posting article \'{article_data["title"]}\' from RSS: {e}")
+                article_title = article_data.get('title', 'Unknown')
+                print(f"Error posting article '{article_title}' from RSS: {e}")
                 # Log this error
     
     except Exception as e:
@@ -164,5 +166,4 @@ if __name__ == "__main__":
 
     finally:
         print(f"Coindesk RSS Agent finished at {datetime.datetime.now()}.")
-        db.close()
-
+        db.close() 

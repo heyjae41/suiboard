@@ -7,9 +7,18 @@ import re # For extracting object ID
 # Configure logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_SUI_BIN_PATH = "/home/ubuntu/sui_bin/sui"
-DEFAULT_GAS_BUDGET = 10000000 
-DEFAULT_MINT_TO_ADDRESS_FOR_BURN = "0xYOUR_SYSTEM_ADDRESS_OR_ACTIVE_CLI_ADDRESS" # Placeholder, will try to get active address
+DEFAULT_SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"
+DEFAULT_GAS_BUDGET = 100000000 
+DEFAULT_MINT_TO_ADDRESS_FOR_BURN = "0xcfd7707740d1e2a7ea3a3d70128d38ced43d59625354b78cb6f3c8794d952264" # Placeholder, will try to get active address
+
+# Default SUI configuration
+DEFAULT_SUI_CONFIG = {
+    "network": "testnet", # or "mainnet", "devnet"
+    "package_id": "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165", # Replace with actual Package ID
+    "treasury_cap_id": "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59", # Replace with actual Treasury Cap ID
+    "gas_budget": DEFAULT_GAS_BUDGET,
+    "sui_bin_path": DEFAULT_SUI_BIN_PATH
+}
 
 class SuiInteractionError(Exception):
     """Custom exception for SUI interaction failures."""
@@ -56,7 +65,8 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
         "--gas-budget", str(gas_budget),
         "--json"
     ]
-    logger.info(f"Executing SUI CLI command: {" ".join(command)}")
+    command_str = " ".join(command)
+    logger.info(f"Executing SUI CLI command: {command_str}")
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         logger.info(f"SUI CLI mint command output: {result.stdout}")
@@ -118,7 +128,8 @@ def reclaim_suiboard_token(amount_to_reclaim: int, sui_config: dict) -> str:
         "--gas-budget", str(gas_budget_mint),
         "--json"
     ]
-    logger.info(f"Executing SUI CLI mint command for reclaim: {" ".join(mint_command)}")
+    mint_command_str = " ".join(mint_command)
+    logger.info(f"Executing SUI CLI mint command for reclaim: {mint_command_str}")
     newly_minted_coin_id = None
     try:
         mint_result = subprocess.run(mint_command, capture_output=True, text=True, check=True)
@@ -176,7 +187,8 @@ def reclaim_suiboard_token(amount_to_reclaim: int, sui_config: dict) -> str:
         "--gas-budget", str(gas_budget_burn),
         "--json"
     ]
-    logger.info(f"Executing SUI CLI burn command: {" ".join(burn_command)}")
+    burn_command_str = " ".join(burn_command)
+    logger.info(f"Executing SUI CLI burn command: {burn_command_str}")
     try:
         burn_result = subprocess.run(burn_command, capture_output=True, text=True, check=True)
         logger.info(f"SUI CLI burn command output: {burn_result.stdout}")

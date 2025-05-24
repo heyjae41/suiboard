@@ -182,15 +182,15 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ```
 # 테이블 이름 접두사 설정
-DB_TABLE_PREFIX='g6_'
-# mysql, postgresql, sqlite
-DB_ENGINE='postgresql'
-DB_USER='postgres'
-DB_PASSWORD='marketmaker'
-DB_HOST='38.242.139.223'
-DB_PORT=5432
-DB_NAME='marketmaker'
-DB_CHARSET='utf8mb4'
+DB_TABLE_PREFIX='****************'
+'****************'
+DB_ENGINE='****************'
+DB_USER='****************'
+DB_PASSWORD='****************'
+DB_HOST='****************'
+DB_PORT='****************'
+DB_NAME='****************'
+DB_CHARSET='****************'
 
 # 이메일 발송 설정
 SMTP_SERVER="localhost"
@@ -284,7 +284,7 @@ COOKIE_DOMAIN = "marketmaker.store"
      ```
    - 기존 지갑 복구 (니모닉 필요):
      ```bash
-     sui client recover-wallet
+     sui keytool import <INPUT_STRING> <KEY_SCHEME> [DERIVATION_PATH]
      ```
 
 3. 활성 주소 확인:
@@ -300,6 +300,14 @@ COOKIE_DOMAIN = "marketmaker.store"
    ```bash
    sui client gas
    ```
+6. 배포된 패키지 및 객체 ID 상수
+   SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"  # SUI 바이너리 실행 파일 경로
+   TOKEN_PACKAGE_ID = "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165"  # 토큰 컨트랙트 패키지 ID (2023-05-10 업데이트)
+   TOKEN_TREASURY_CAP_ID = "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59"  # 토큰 관리 권한 객체 ID (2023-05-10 업데이트)
+   STORAGE_PACKAGE_ID = "0x1fad2576bf6359f0fafc8c089723c80fed4784f5e3ee508b037c5280f91e543f"  # 스토리지 컨트랙트 패키지 ID (2023-05-10 업데이트)
+   BOARD_STORAGE_ID = "0xb07d7417fed89e22255fada05fa0e63b07465f9a05a0cb25ca66ffb71bc95902"  # 게시판 스토리지 객체 ID (2023-05-10 업데이트)
+   CLOCK_ID = "0x6"  # SUI의 시간 관련 시스템 객체 ID
+   GAS_BUDGET = 100000000  # 트랜잭션 실행에 필요한 가스 예산 (필요에 따라 조정)
 
 ### 5.3. Ubuntu 서버에 SUI CLI 설치
 

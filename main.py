@@ -154,6 +154,12 @@ async def main_middleware(request: Request, call_next):
         session_mb_id = request.session.get("ss_mb_id", "")
         cookie_mb_id = request.cookies.get("ck_mb_id", "")
         current_ip = get_client_ip(request)
+        
+        # 디버깅: 세션 정보 출력
+        print(f"=== 세션 체크 === URL: {url_path}")
+        print(f"세션 MB ID: {session_mb_id}")
+        print(f"쿠키 MB ID: {cookie_mb_id}")
+        print(f"전체 세션: {dict(request.session)}")
 
         try:
             member_service = MemberService(request, db)

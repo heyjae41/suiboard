@@ -1,11 +1,14 @@
 # /home/ubuntu/suiboard_project_v3/service/agent_service.py
 import datetime
 import logging # Added for logging SUI interactions
+from datetime import timedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
-from core.models import Member, Board, WriteBaseModel, Config # Assuming Config might hold SUI settings
-from lib.board_lib import insert_board_new, get_next_wr_num, generate_reply_character
-from lib.point import insert_point
+from core.models import Member, Board, Config, Point # Assuming Config might hold SUI settings
+from lib.board_lib import insert_board_new, get_next_num, generate_reply_character
+from lib.common import dynamic_create_write_table
+
 from lib.common import get_client_ip # For wr_ip, might need a mock or fixed IP for agent
 from lib.sui_service import award_suiboard_token, SuiInteractionError # Import SUI service
 # Import the SUI transaction logging service
@@ -18,12 +21,12 @@ logger = logging.getLogger(__name__)
 # Example: These would be specific to your SUI deployment (Testnet/Mainnet)
 DEFAULT_SUI_CONFIG = {
     "network": "testnet", # or "mainnet", "devnet"
-    "package_id": "0xYOUR_PACKAGE_ID", # Replace with actual Package ID
-    "treasury_cap_id": "0xYOUR_TREASURY_CAP_ID", # Replace with actual Treasury Cap ID
-    "gas_budget": 20000000, # Adjust as needed
-    "sui_bin_path": "/home/ubuntu/sui_bin/sui" # Default path, ensure it's correct
+    "package_id": "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165", # Replace with actual Package ID
+    "treasury_cap_id": "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59", # Replace with actual Treasury Cap ID
+    "gas_budget": 100000000, # Adjust as needed
+    "sui_bin_path": "/home/linuxbrew/.linuxbrew/bin/sui" # Default path, ensure it's correct
 }
-TOKEN_AWARD_AMOUNT_POST_CREATION = 200 # Example: 2.00 tokens (assuming 2 decimals)
+TOKEN_AWARD_AMOUNT_POST_CREATION = 200 # Example: 200 smallest units (2.00 tokens with 2 decimals)
 
 def create_post_by_agent(
     db: Session,
@@ -41,7 +44,7 @@ def create_post_by_agent(
     ca_name: str = None, # Category
     wr_ip: str = "0.0.0.0", # Agent's IP or a placeholder
     sui_config_override: dict = None # Allow overriding default SUI config for flexibility
-) -> WriteBaseModel:
+):
     """
     Creates a post as if an agent (specified by mb_id) wrote it.
     This function replicates the core logic of CreatePostService for agent-based posting
@@ -66,9 +69,10 @@ def create_post_by_agent(
     
     hashed_password = ""
 
-    write = WriteBaseModel()
-    write.wr_num = get_next_wr_num(db, board.bo_table)
-    write.bo_table = board.bo_table
+    # Create dynamic write table model for the target board
+    WriteModel = dynamic_create_write_table(bo_table, create_table=True)
+    write = WriteModel()
+    write.wr_num = get_next_num(board.bo_table)
     write.wr_reply = ""
     write.wr_parent = 0 
     write.wr_is_comment = 0
@@ -103,12 +107,34 @@ def create_post_by_agent(
     db.commit()
     logger.info(f"Agent {mb_id} created post {write.wr_id} in board {bo_table}.")
 
-    insert_board_new(db, board.bo_table, write)
+    insert_board_new(board.bo_table, write)
     db.commit() 
 
     if member.mb_id and board.bo_write_point:
         point_content = f"{board.bo_subject} {write.wr_id} 글쓰기 (에이전트)"
-        insert_point(db, member.mb_id, board.bo_write_point, point_content, board.bo_table, write.wr_id, "쓰기")
+        # 직접 포인트 데이터베이스에 저장 (agent 전용)
+        
+        # 회원의 현재 포인트 계산
+        current_points = db.query(func.sum(Point.po_point)).filter(Point.mb_id == member.mb_id).scalar() or 0
+        new_total_points = current_points + board.bo_write_point
+        
+        # 포인트 내역 추가
+        new_point = Point(
+            mb_id=member.mb_id,
+            po_content=point_content,
+            po_point=board.bo_write_point,
+            po_use_point=0,
+            po_mb_point=new_total_points,
+            po_expired=0,
+            po_expire_date=datetime.datetime(9999, 12, 31),  # 만료되지 않는 포인트
+            po_rel_table=board.bo_table,
+            po_rel_id=str(write.wr_id),
+            po_rel_action="쓰기"
+        )
+        db.add(new_point)
+        
+        # 회원 포인트 업데이트
+        member.mb_point = new_total_points
         db.commit()
         logger.info(f"Points ({board.bo_write_point}) awarded to {member.mb_id} for post {write.wr_id}.")
 

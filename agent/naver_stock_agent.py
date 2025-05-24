@@ -10,7 +10,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(PROJECT_ROOT)
 
 from sqlalchemy.orm import Session
-from core.database import SessionLocal, engine # Assuming SessionLocal is your session factory
+from core.database import db_connect
 from service.agent_service import create_post_by_agent
 from core.models import Member, Board # To check/create agent member and board
 
@@ -25,7 +25,7 @@ AGENT_MEMBER_PASSWORD = "sha256:12000:efqEs0FMP6uM7M+xLFQXZTd1/41juBDb:mex5gcyH+
 # --- Database Setup --- #
 # This is a simplified setup. In a real app, SessionLocal might be managed by FastAPI dependencies.
 def get_db():
-    db = SessionLocal()
+    db = db_connect.sessionLocal()
     try:
         yield db
     finally:
@@ -84,48 +84,44 @@ def scrape_naver_finance_news():
         response.encoding = response.apparent_encoding # Or manually set to 'euc-kr' or 'utf-8'
 
         soup = BeautifulSoup(response.text, "html.parser")
+        print(f"페이지 로드 성공. 응답 크기: {len(response.text)} bytes")
         
-        # Find news items. Selector might need adjustment if Naver changes layout.
-        # Example: looking for <li> elements within a specific <ul> list of news
-        # This is a common structure, but needs verification.
-        # Let's try to find news items from the main news list area
-        # Common selectors for Naver news lists are often like 'ul.realtime_news_list li' or similar.
-        # For mainnews, it's often a bit different. Inspecting https://finance.naver.com/news/mainnews.naver
-        # The news items are in <dd class="articleSubject"> or <dt class="articleSubject"> for titles
-        # and <dd class="articleSummary"> for summaries.
-        # Let's target the main news list section, often within a div like 'news_section'.
-        # A more robust selector would be needed after careful inspection.
-        # For now, let's try a general approach based on common Naver Finance news structure.
-        # The structure is: <div class="news_cluster_list"> <div class="news_cluster"> <div class="cluster_head"> <a href="...">TITLE</a> </div> <div class="cluster_body"> <ul class="cluster_news_list"> <li> <a href="...">article_title</a> <span class="writing">press</span> <span class="date">date</span> </li> ...
-        # This is for clustered news. Let's try the main news list which is simpler.
-        # The main news list items are often in <dl class="newsList"> <dt> <a href="...">TITLE</a> </dt> <dd>SUMMARY <span class="articleInfo">...</span></dd> </dl>
-        # Looking at the source of mainnews.naver, it seems like news items are in <li> tags inside <ul class="newsList"> (this is old structure)
-        # Current structure (2024-2025) for mainnews.naver seems to be more complex.
-        # Let's try to find elements with class "newsList" or "articleSubject" and "articleSummary".
-        # A common pattern is a list of articles, each with a title and a link.
-        # The main news page has several sections. We'll try the first prominent list.
+        # 디버깅: 페이지의 주요 구조 확인
+        print("=== 페이지 구조 디버깅 ===")
         
-        news_items = [] # Store (title, link, summary_or_content)
-        
-        # Attempt 1: Find news list by a common class like 'news_list' or 'main_news_list'
-        # This is highly dependent on Naver's current HTML structure.
-        # For https://finance.naver.com/news/mainnews.naver, news are within <ul> with class 'newsList'
-        # and each item is an <li>. Inside <li>, there's an <a> tag for the title and link.
-        # Example: <ul class="newsList"> <li> <span class="thumb"><img ...></span> <a href="URL">TITLE</a> <span class="writing">PRESS</span> <span class="date">DATE</span> </li> ... </ul>
-        # This is for the image list. Text list is different.
-        # Text list: <div class="news_text_list"> <ul> <li> <a href="URL">TITLE</a> <span class="writing">PRESS</span> <span class="date">DATE</span> </li> ... </ul> </div>
-
-        # Let's try to get the main news headlines from the top section.
-        # These are usually in <dd class="articleSubject"> or <dt class="articleSubject">
-        # For mainnews.naver, the main headlines are in <div id="contentarea_left">
-        # <div class="mainNewsList"> <dl> <dt class="articleSubject"> <a href="...">TITLE</a> </dt> <dd class="articleSummary"> SUMMARY... </dd> </dl> ... </div>
-        
+        # 1. mainNewsList 확인
         main_news_section = soup.find("div", class_="mainNewsList")
+        print(f"mainNewsList 섹션 찾음: {main_news_section is not None}")
+        
+        # 2. 다른 가능한 뉴스 섹션들 확인
+        possible_sections = [
+            "newsList", "news_list", "main_news", "news_area", 
+            "articleList", "article_list", "contentarea_left"
+        ]
+        
+        for section_class in possible_sections:
+            section = soup.find("div", class_=section_class) or soup.find("ul", class_=section_class)
+            print(f"{section_class} 섹션 찾음: {section is not None}")
+            if section:
+                links = section.find_all("a")
+                print(f"  - {section_class}에서 링크 {len(links)}개 발견")
+        
+        # 3. 전체 페이지에서 뉴스 관련 링크들 확인
+        all_links = soup.find_all("a", href=True)
+        news_links = [link for link in all_links if "news" in link.get("href", "")]
+        print(f"전체 페이지에서 뉴스 관련 링크: {len(news_links)}개")
+        
+        # 4. 기존 로직 시도
         if main_news_section:
+            print("mainNewsList 섹션에서 뉴스 추출 시도...")
             news_dls = main_news_section.find_all("dl")
-            for dl_item in news_dls[:5]: # Get top 5 articles
+            print(f"dl 요소 {len(news_dls)}개 발견")
+            
+            for i, dl_item in enumerate(news_dls[:5]): # Get top 5 articles
                 title_tag = dl_item.find("dt", class_="articleSubject")
                 summary_tag = dl_item.find("dd", class_="articleSummary")
+                
+                print(f"기사 {i+1}: title_tag={title_tag is not None}, summary_tag={summary_tag is not None}")
                 
                 if title_tag and title_tag.a and summary_tag:
                     title = title_tag.a.get_text(strip=True)
@@ -144,23 +140,72 @@ def scrape_naver_finance_news():
                     summary = " ".join(summary_parts).strip()
                     summary = summary.split("...")[0] + "..." # Often ends with '...'
 
-                    # For content, we might need to fetch the article page (link)
-                    # For now, let's use summary as content or a part of it.
-                    # To keep it simple, we'll use summary as the main content for now.
-                    # In a real scenario, you'd visit 'link' to get full article content.
                     content = summary 
                     if not content: # If summary is empty, use title as content
                         content = title
 
                     articles.append({"title": title, "link": link, "content": content})
-                    print(f"Scraped: {title}")
+                    print(f"추출된 기사: {title}")
         else:
-            print("Could not find main news section. Scraping might fail or get no articles.")
+            print("mainNewsList 섹션을 찾을 수 없음. 대체 방법 시도...")
+            
+            # 대체 방법 1: 일반적인 뉴스 링크 패턴 찾기
+            news_links = soup.find_all("a", href=lambda href: href and "news.naver.com" in href)[:10]
+            print(f"news.naver.com 링크 {len(news_links)}개 발견")
+            
+            for i, link in enumerate(news_links[:5]):
+                title = link.get_text(strip=True)
+                if title and len(title) > 10:  # 제목이 충분히 긴 경우만
+                    href = link["href"]
+                    if not href.startswith("http"):
+                        href = "https://finance.naver.com" + href
+                    
+                    articles.append({
+                        "title": title,
+                        "link": href,
+                        "content": title  # 요약이 없으므로 제목을 내용으로 사용
+                    })
+                    print(f"대체 방법으로 추출된 기사: {title}")
+            
+            # 대체 방법 2: 더 일반적인 패턴으로 기사 찾기
+            if not articles:
+                print("더 일반적인 패턴으로 기사 찾기 시도...")
+                # 제목이 긴 링크들을 찾기
+                all_links = soup.find_all("a", href=True)
+                potential_articles = []
+                
+                for link in all_links:
+                    text = link.get_text(strip=True)
+                    href = link.get("href", "")
+                    
+                    # 뉴스 기사로 보이는 조건들
+                    if (len(text) > 15 and 
+                        len(text) < 200 and
+                        ("read.naver.com" in href or "news" in href) and
+                        not any(skip in text.lower() for skip in ["더보기", "관련기사", "댓글", "공유"])):
+                        
+                        potential_articles.append({
+                            "title": text,
+                            "link": href if href.startswith("http") else "https://finance.naver.com" + href,
+                            "content": text
+                        })
+                
+                # 중복 제거 후 상위 5개 선택
+                seen_titles = set()
+                for article in potential_articles:
+                    if article["title"] not in seen_titles and len(articles) < 5:
+                        articles.append(article)
+                        seen_titles.add(article["title"])
+                        print(f"일반 패턴으로 추출된 기사: {article['title']}")
+
+        print(f"=== 최종 결과: {len(articles)}개 기사 추출 ===")
 
     except requests.exceptions.RequestException as e:
         print(f"Error during requests to {NAVER_FINANCE_NEWS_URL}: {e}")
     except Exception as e:
         print(f"An error occurred during scraping: {e}")
+        import traceback
+        traceback.print_exc()
     
     return articles
 
