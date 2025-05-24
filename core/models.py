@@ -368,6 +368,9 @@ class Member(Base):
     scraps: DynamicMapped["Scrap"] = relationship(
         "Scrap", back_populates="member", lazy="dynamic"
     )
+    # sui_transaction_logs: DynamicMapped["SuiTransactionlog"] = relationship(
+    #     "SuiTransactionlog", back_populates="member", lazy="dynamic"
+    # )
 
 
 class Group(Base):
@@ -1218,23 +1221,47 @@ class Login(Base):
     lo_url = Column(Text, nullable=False)
 
 
-
 class SuiTransactionlog(Base):
-    __tablename__ = DB_TABLE_PREFIX + "sui_transaction_log"
-
+    """SUI 트랜잭션 로그"""
+    __tablename__ = "sui_transactionlog"
+    
     stl_id = Column(Integer, primary_key=True, autoincrement=True)
-    mb_id = Column(String(20), ForeignKey(DB_TABLE_PREFIX + "member.mb_id"), nullable=False, index=True)
-    wr_id = Column(Integer, nullable=True, index=True) # Can be null if not related to a specific post (e.g., login bonus)
-    bo_table = Column(String(20), nullable=True, index=True) # Board table, can be null
-    stl_amount = Column(BIGINT, nullable=False) # Amount in smallest unit
-    stl_tx_hash = Column(String(255), nullable=True, unique=True) # SUI Transaction Hash, can be null if TX failed before submission
-    stl_status = Column(String(20), nullable=False)  # e.g., "success", "failed"
-    stl_reason = Column(String(255), nullable=True) # e.g., "게시글 작성 보상", "로그인 보상"
-    stl_datetime = Column(DateTime, nullable=False, default=func.now())
-    stl_error_message = Column(Text, nullable=True) # Store error message if status is "failed"
+    mb_id = Column(String(20), nullable=False, index=True, comment="회원 ID")
+    wr_id = Column(Integer, nullable=True, comment="게시글 ID")
+    bo_table = Column(String(20), nullable=True, comment="게시판 테이블명")
+    stl_amount = Column(BIGINT, nullable=False, comment="토큰 수량")
+    stl_reason = Column(String(50), nullable=False, comment="발생 사유")
+    stl_tx_hash = Column(String(255), nullable=True, comment="트랜잭션 해시")
+    stl_status = Column(String(20), nullable=False, comment="상태")
+    stl_datetime = Column(DateTime, nullable=False, comment="거래 일시")
+    stl_error_message = Column(Text, nullable=True, comment="오류 메시지")
 
-    member = relationship("Member", backref="sui_transaction_logs")
-    # If wr_id and bo_table are to be foreign keys to a generic WriteModel, 
-    # it might require a more complex setup or separate FKs per board table if not using a unified WriteModel.
-    # For simplicity, keeping wr_id and bo_table as indexed fields for now.
+    # 관계설정은 일시적으로 주석 처리
+    # member = relationship("Member", back_populates="sui_transaction_logs", foreign_keys=[mb_id])
+
+
+class TokenSupply(Base):
+    """SUIBOARD 토큰 총 발행량 관리"""
+    __tablename__ = "token_supply"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    total_minted = Column(BIGINT, nullable=False, default=0, comment="총 발행량")
+    total_burned = Column(BIGINT, nullable=False, default=0, comment="총 소각량")
+    max_supply = Column(BIGINT, nullable=False, default=100000000, comment="최대 발행 한도 (1억개)")
+    last_updated = Column(DateTime, nullable=False, default=datetime.now, comment="마지막 업데이트")
+    notes = Column(Text, nullable=True, comment="비고")
+    
+    @property
+    def circulating_supply(self):
+        """순 유통량 (발행량 - 소각량)"""
+        return self.total_minted - self.total_burned
+    
+    @property
+    def remaining_supply(self):
+        """남은 발행 가능량"""
+        return self.max_supply - self.total_minted
+    
+    def can_mint(self, amount: int) -> bool:
+        """추가 발행 가능 여부 확인"""
+        return self.total_minted + amount <= self.max_supply
 

@@ -2,11 +2,11 @@ from typing_extensions import List, Annotated
 import logging # Added for logging
 
 from fastapi import Depends, Request, HTTPException, Path
-from sqlalchemy import select, exists, delete, update
+from sqlalchemy import select, exists, delete, update, and_
 from sqlalchemy.orm import Session # Ensure Session is imported for type hinting
 
 from core.database import db_session
-from core.models import Member, BoardNew, Scrap, WriteBaseModel, SuiTransactionlog # Import SuiTransactionlog
+from core.models import Member, BoardNew, Scrap, WriteBaseModel, SuiTransactionlog, TokenSupply # Import SuiTransactionlog and TokenSupply
 from lib.board_lib import is_owner, FileCache
 from lib.common import remove_query_params, set_url_query_params
 from service.board_file_service import BoardFileService
@@ -14,6 +14,7 @@ from service.point_service import PointService
 from .board import BoardService
 from lib.sui_service import reclaim_suiboard_token, SuiInteractionError, DEFAULT_SUI_CONFIG # Import SUI service
 from service.sui_transaction_log_service import log_sui_transaction # Import SUI transaction logging service
+from lib.walrus_service import retrieve_post_from_walrus, WalrusError, DEFAULT_WALRUS_CONFIG # Import Walrus service
 
 logger = logging.getLogger(__name__) # Setup logger
 
@@ -91,106 +92,115 @@ class DeletePostService(BoardService):
          if not self.is_delete_by_comment(self.wr_id):
             self.raise_exception(detail=f"이 글과 관련된 댓글이 {self.board.bo_count_delete}건 이상 존재하므로 삭제 할 수 없습니다.", status_code=403)
 
-    def delete_write(self, sui_config_override: dict = None):
-        """게시글 삭제 처리 및 SUI 토큰 회수"""
-        write_model = self.write_model
-        db: Session = self.db # type hint for clarity
-        bo_table = self.bo_table
-        board = self.board
-        original_post_writer_mb_id = self.write.mb_id
-        original_post_wr_id = self.write.wr_id
-
-        # 1. Find the amount of SUI tokens awarded for this post
-        awarded_token_log = db.scalar(
-            select(SuiTransactionlog)
-            .where(
-                SuiTransactionlog.wr_id == original_post_wr_id,
-                SuiTransactionlog.bo_table == bo_table,
-                SuiTransactionlog.stl_status == "success",
-                SuiTransactionlog.stl_reason.like("%게시글 작성 보상%") # Match original award reason
-            )
-            .order_by(SuiTransactionlog.stl_datetime.desc()) # Get the latest one if multiple
-        )
-
-        amount_to_reclaim = 0
-        if awarded_token_log and awarded_token_log.stl_amount > 0:
-            amount_to_reclaim = awarded_token_log.stl_amount
-            logger.info(f"Post {original_post_wr_id} in {bo_table} was awarded {amount_to_reclaim} tokens. Attempting reclaim.")
-        else:
-            logger.info(f"No successful SUI token award found for post {original_post_wr_id} in {bo_table}, or amount is zero. Skipping reclaim.")
-
-        # 원글 + 댓글
-        delete_write_count = 0
-        delete_comment_count = 0
-        writes: List[WriteBaseModel] = db.scalars(
-            select(write_model)
-            .filter_by(wr_parent=original_post_wr_id)
-            .order_by(write_model.wr_id)
-        ).all()
-        for write_item in writes:
-            if not write_item.wr_is_comment:
-                if not self.point_service.delete_point(write_item.mb_id, bo_table, original_post_wr_id, "쓰기"):
-                    self.point_service.save_point(write_item.mb_id, board.bo_write_point * (-1),
-                                                    f"{board.bo_subject} {original_post_wr_id} 글 삭제")
-                self.file_service.delete_board_files(board.bo_table, original_post_wr_id)
-                delete_write_count += 1
-            else:
-                if not self.point_service.delete_point(write_item.mb_id, bo_table, original_post_wr_id, "댓글"):
-                    self.point_service.save_point(self.request, write_item.mb_id, board.bo_comment_point * (-1),
-                                                  f"{board.bo_subject} {original_post_wr_id} 댓글 삭제")
-                delete_comment_count += 1
-
-        db.execute(delete(write_model).filter_by(wr_parent=original_post_wr_id))
-        db.execute(delete(BoardNew).where(BoardNew.bo_table == bo_table, BoardNew.wr_parent == original_post_wr_id))
-        db.execute(delete(Scrap).filter_by(bo_table=bo_table, wr_id=original_post_wr_id))
-        board.bo_notice = self.set_board_notice(original_post_wr_id, False)
-        board.bo_count_write -= delete_write_count
-        board.bo_count_comment -= delete_comment_count
-
-        # 2. Attempt to reclaim SUI tokens if an award was found
-        if amount_to_reclaim > 0 and original_post_writer_mb_id:
-            logger.info(f"Attempting to reclaim {amount_to_reclaim} SUI tokens for deleted post {original_post_wr_id}.")
-            current_sui_config = DEFAULT_SUI_CONFIG.copy()
-            if sui_config_override:
-                current_sui_config.update(sui_config_override)
-
-            reclaim_tx_digest = None
-            reclaim_status = "failed"
-            reclaim_error_msg = None
-            try:
-                reclaim_tx_digest = reclaim_suiboard_token(
-                    amount_to_reclaim=amount_to_reclaim,
-                    sui_config=current_sui_config
-                )
-                reclaim_status = "success"
-                logger.info(f"SUI token reclaim successful for deleted post {original_post_wr_id}. TX Digest: {reclaim_tx_digest}")
-            except SuiInteractionError as e:
-                reclaim_error_msg = str(e)
-                logger.error(f"SUI token reclaim failed for deleted post {original_post_wr_id}. Error: {reclaim_error_msg}")
-            except ValueError as e: # From sui_config validation
-                reclaim_error_msg = str(e)
-                logger.error(f"SUI configuration error during token reclaim for post {original_post_wr_id}. Error: {reclaim_error_msg}")
-            except Exception as e:
-                reclaim_error_msg = f"Unexpected error during SUI token reclaim: {str(e)}"
-                logger.error(f"{reclaim_error_msg} for post {original_post_wr_id}")
-            
-            # Log the reclaim transaction attempt to DB
-            log_sui_transaction(
-                db=db,
-                mb_id=original_post_writer_mb_id, # Log against the original post writer
-                wr_id=original_post_wr_id,
-                bo_table=bo_table,
-                stl_amount=-amount_to_reclaim, # Log reclaimed amount as negative
-                stl_tx_hash=reclaim_tx_digest,
-                stl_status=reclaim_status,
-                stl_reason="게시글 삭제로 인한 토큰 회수",
-                stl_error_message=reclaim_error_msg
-            )
+    def delete_post(self, write_id: int):
+        """게시글 삭제 및 SUIBOARD 토큰 회수"""
+        write = self.get_write(write_id)
         
-        db.commit()
-        # db.close() # Closing session here might be premature if called from a larger transaction context
+        # SUIBOARD 토큰 회수 (에이전트가 아닌 경우만)
+        if not write.mb_id.startswith('gg_'):
+            try:
+                # 게시글 작성 보상으로 지급된 토큰 회수
+                token_amount = 1  # 게시글 작성 시 지급된 토큰 양
+                
+                # 실제 SUIBOARD 토큰 회수 (소각)
+                tx_hash = reclaim_suiboard_token(
+                    amount_to_reclaim=token_amount,
+                    sui_config=DEFAULT_SUI_CONFIG
+                )
+                
+                # 소각량 추적 업데이트
+                from core.database import get_db
+                from datetime import datetime
+                
+                db = next(get_db())
+                try:
+                    supply_record = db.query(TokenSupply).first()
+                    if supply_record:
+                        supply_record.total_burned += token_amount
+                        supply_record.last_updated = datetime.now()
+                        supply_record.notes = f"Burned {token_amount} tokens from deleted post {write_id}"
+                        db.commit()
+                        logger.info(f"토큰 소각량 추적 업데이트: +{token_amount}, 총 소각량: {supply_record.total_burned}")
+                    else:
+                        logger.warning("TokenSupply 레코드가 없어 소각량 추적 불가")
+                finally:
+                    db.close()
+                
+                # 트랜잭션 로그 저장
+                from core.models import SuiTransactionlog
+                sui_log = SuiTransactionlog(
+                    mb_id=write.mb_id,
+                    wr_id=write.wr_id,
+                    bo_table=self.bo_table,
+                    stl_amount=-token_amount,  # 음수로 회수 표시
+                    stl_reason="post_deletion", 
+                    stl_tx_hash=tx_hash,
+                    stl_status="success",
+                    stl_datetime=datetime.now(),
+                    stl_error_message=None
+                )
+                self.db.add(sui_log)
+                logger.info(f"SUIBOARD 토큰 {token_amount} 회수 완료: {write.mb_id}, 게시글 {write.wr_id}, TX: {tx_hash}")
+                
+            except Exception as e:
+                logger.error(f"SUIBOARD 토큰 회수 실패: {write.mb_id}, 게시글 {write.wr_id}, 오류: {str(e)}")
+                # 실패 로그 저장
+                from core.models import SuiTransactionlog
+                sui_log = SuiTransactionlog(
+                    mb_id=write.mb_id,
+                    wr_id=write.wr_id,
+                    bo_table=self.bo_table,
+                    stl_amount=-1,
+                    stl_reason="post_deletion",
+                    stl_tx_hash=None,
+                    stl_status="failed",
+                    stl_datetime=datetime.now(),
+                    stl_error_message=str(e)
+                )
+                self.db.add(sui_log)
 
-        FileCache().delete_prefix(f"latest-{bo_table}")
+        # Walrus에서 게시글 처리 (삭제는 불가능하므로 로그만 기록)
+        self._handle_walrus_deletion(write)
+        
+        # 댓글이 있는 경우 댓글들도 모두 삭제
+        comments = self.db.scalars(
+            select(self.write_model).where(
+                and_(
+                    self.write_model.wr_parent == write.wr_parent,
+                    self.write_model.wr_is_comment == 1
+                )
+            )
+        ).all()
+        
+        for comment in comments:
+            self.delete_comment(comment)
+        
+        # 게시글 삭제
+        self.db.delete(write)
+        self.board.bo_count_write = self.board.bo_count_write - 1
+        self.db.commit()
+
+    def _handle_walrus_deletion(self, write_item):
+        """Walrus에서 게시글 처리 (삭제 기록)"""
+        try:
+            if write_item.wr_link2 and write_item.wr_link2.startswith('walrus:'):
+                blob_id = write_item.wr_link2.replace('walrus:', '')
+                
+                # Walrus에서 게시글 정보 조회하여 삭제 상태 확인
+                # 참고: Walrus는 불변 스토리지이므로 실제 삭제는 불가능
+                # 여기서는 삭제 상태만 로그로 기록
+                post_data = retrieve_post_from_walrus(blob_id, DEFAULT_WALRUS_CONFIG)
+                
+                if post_data:
+                    logger.info(f"게시글 {write_item.wr_id}가 Walrus에서 확인됨 (blob_id: {blob_id}). "
+                              f"Walrus는 불변 스토리지이므로 데이터는 그대로 유지됨.")
+                else:
+                    logger.warning(f"게시글 {write_item.wr_id}의 Walrus 데이터를 찾을 수 없음 (blob_id: {blob_id})")
+                    
+        except WalrusError as e:
+            logger.error(f"게시글 {write_item.wr_id}의 Walrus 처리 중 오류: {str(e)}")
+        except Exception as e:
+            logger.error(f"게시글 {write_item.wr_id}의 Walrus 처리 중 예상치 못한 오류: {str(e)}")
 
 # ... (rest of the file: DeleteCommentService, ListDeleteService remains the same) ...
 

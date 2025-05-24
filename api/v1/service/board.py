@@ -174,8 +174,44 @@ class CreatePostServiceAPI(CreatePostService):
 
         write.wr_parent = write.wr_id  # 부모아이디 설정
         self.board.bo_count_write = self.board.bo_count_write + 1  # 게시판 글 갯수 1 증가
+        
+        # Walrus 스토리지에 게시글 저장 (답글이 아닌 경우만)
+        if not parent_write:
+            self._store_post_to_walrus(write)
+        
         self.db.commit()
         return write
+    
+    def _store_post_to_walrus(self, write):
+        """게시글을 Walrus 스토리지에 저장"""
+        try:
+            from lib.walrus_service import store_post_on_walrus, WalrusError, DEFAULT_WALRUS_CONFIG
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # 게시글 데이터 준비
+            author_name = self.member.mb_nick if self.member and self.member.mb_nick else write.wr_name
+            
+            # Walrus에 저장
+            blob_id = store_post_on_walrus(
+                title=write.wr_subject,
+                content=write.wr_content,
+                author=author_name,
+                board_table=self.bo_table,
+                walrus_config=DEFAULT_WALRUS_CONFIG
+            )
+            
+            if blob_id:
+                # blob_id를 게시글의 wr_link2에 저장 (임시 방편)
+                write.wr_link2 = f"walrus:{blob_id}"
+                logger.info(f"API: 게시글 {write.wr_id}을 Walrus에 저장 완료: {blob_id}")
+            else:
+                logger.warning(f"API: 게시글 {write.wr_id}의 Walrus 저장 실패: blob_id 없음")
+                
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"API: 게시글 {write.wr_id}의 Walrus 저장 중 오류: {str(e)}")
 
 class UpdatePostServiceAPI(UpdatePostService):
     """

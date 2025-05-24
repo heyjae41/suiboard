@@ -16,6 +16,13 @@ from api.v1.models.board import WriteModel, WriteTransportation
 from service.point_service import PointService
 from . import BoardService
 from service.board_file_service import BoardFileService
+from service.sui_token_service import SuiTokenService
+from lib.sui_service import award_suiboard_token, DEFAULT_SUI_CONFIG
+from lib.walrus_service import store_post_on_walrus, WalrusError, DEFAULT_WALRUS_CONFIG
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CreatePostService(BoardService):
     """
@@ -44,12 +51,58 @@ class CreatePostService(BoardService):
         return instance
 
     def add_point(self, write, parent_write: WriteBaseModel = None):
-        """포인트 추가"""
+        """포인트 추가 및 SUI 토큰 지급"""
         if self.member.mb_id:
             point = self.board.bo_comment_point if parent_write else self.board.bo_write_point
             content = f"{self.board.bo_subject} {write.wr_id} 글" + ("답변" if parent_write else "쓰기")
             self.point_service.save_point(self.member.mb_id, point, content,
                                           self.bo_table, write.wr_id, "쓰기")
+            
+            # SUIBOARD 토큰 지급 (일반 회원만, 에이전트 제외)
+            if not parent_write and not self.member.mb_id.startswith('gg_') and self.member.mb_sui_address:
+                try:
+                    sui_token_service = SuiTokenService(self.request, self.db)
+                    token_amount = 1  # 게시글 작성 보상
+                    
+                    # 실제 SUIBOARD 토큰 지급
+                    tx_hash = award_suiboard_token(
+                        recipient_address=self.member.mb_sui_address,
+                        amount=token_amount,
+                        sui_config=DEFAULT_SUI_CONFIG
+                    )
+                    
+                    # 트랜잭션 로그 저장
+                    from core.models import SuiTransactionlog
+                    sui_log = SuiTransactionlog(
+                        mb_id=self.member.mb_id,
+                        wr_id=write.wr_id,
+                        bo_table=self.bo_table,
+                        stl_amount=token_amount,
+                        stl_reason="post_creation",
+                        stl_tx_hash=tx_hash,
+                        stl_status="success",
+                        stl_datetime=datetime.now(),
+                        stl_error_message=None
+                    )
+                    self.db.add(sui_log)
+                    logger.info(f"SUIBOARD 토큰 {token_amount} 지급 완료: {self.member.mb_id}, 게시글 {write.wr_id}, TX: {tx_hash}")
+                    
+                except Exception as e:
+                    logger.error(f"SUIBOARD 토큰 지급 실패: {self.member.mb_id}, 게시글 {write.wr_id}, 오류: {str(e)}")
+                    # 실패 로그 저장
+                    from core.models import SuiTransactionlog
+                    sui_log = SuiTransactionlog(
+                        mb_id=self.member.mb_id,
+                        wr_id=write.wr_id,
+                        bo_table=self.bo_table,
+                        stl_amount=1,
+                        stl_reason="post_creation",
+                        stl_tx_hash=None,
+                        stl_status="failed",
+                        stl_datetime=datetime.now(),
+                        stl_error_message=str(e)
+                    )
+                    self.db.add(sui_log)
 
     def save_write(self, parent_id, data: Union[WriteForm, WriteModel]):
         """게시글을 저장"""
@@ -67,8 +120,40 @@ class CreatePostService(BoardService):
 
         write.wr_parent = write.wr_id  # 부모아이디 설정
         self.board.bo_count_write = self.board.bo_count_write + 1  # 게시판 글 갯수 1 증가
+        
+        # Walrus 스토리지에 게시글 저장 (답글이 아닌 경우만)
+        if not parent_write:
+            self._store_post_to_walrus(write)
+        
         self.db.commit()
         return write
+    
+    def _store_post_to_walrus(self, write):
+        """게시글을 Walrus 스토리지에 저장"""
+        try:
+            # 게시글 데이터 준비
+            author_name = self.member.mb_nick if self.member and self.member.mb_nick else write.wr_name
+            
+            # Walrus에 저장
+            blob_id = store_post_on_walrus(
+                title=write.wr_subject,
+                content=write.wr_content,
+                author=author_name,
+                board_table=self.bo_table,
+                walrus_config=DEFAULT_WALRUS_CONFIG
+            )
+            
+            if blob_id:
+                # blob_id를 게시글의 wr_link2에 저장 (임시 방편)
+                write.wr_link2 = f"walrus:{blob_id}"
+                logger.info(f"게시글 {write.wr_id}을 Walrus에 저장 완료: {blob_id}")
+            else:
+                logger.warning(f"게시글 {write.wr_id}의 Walrus 저장 실패: blob_id 없음")
+                
+        except WalrusError as e:
+            logger.error(f"게시글 {write.wr_id}의 Walrus 저장 실패: {str(e)}")
+        except Exception as e:
+            logger.error(f"게시글 {write.wr_id}의 Walrus 저장 중 예상치 못한 오류: {str(e)}")
 
     async def validate_captcha(self, recaptcha_response: str):
         """캡차 검증"""

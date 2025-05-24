@@ -14,8 +14,8 @@ DEFAULT_MINT_TO_ADDRESS_FOR_BURN = "0xcfd7707740d1e2a7ea3a3d70128d38ced43d596253
 # Default SUI configuration
 DEFAULT_SUI_CONFIG = {
     "network": "testnet", # or "mainnet", "devnet"
-    "package_id": "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165", # Replace with actual Package ID
-    "treasury_cap_id": "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59", # Replace with actual Treasury Cap ID
+    "package_id": "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165", # 패키지 ID
+    "treasury_cap_id": "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59", # Treasury Cap ID
     "gas_budget": DEFAULT_GAS_BUDGET,
     "sui_bin_path": DEFAULT_SUI_BIN_PATH
 }
@@ -40,60 +40,103 @@ def _get_active_sui_address(sui_bin_path: str) -> str:
         logger.error(f"Unexpected error getting active SUI address: {e}")
         raise SuiInteractionError(f"Unexpected error getting active SUI address: {e}")
 
-def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) -> str:
-    logger.info(f"Attempting to award {amount} Suiboard tokens to {recipient_address}")
-    required_keys = ["package_id", "treasury_cap_id"]
-    for key in required_keys:
-        if key not in sui_config:
-            raise ValueError(f"Missing required SUI configuration key: {key}")
-
-    sui_bin_path = sui_config.get("sui_bin_path", DEFAULT_SUI_BIN_PATH)
-    package_id = sui_config["package_id"]
-    treasury_cap_id = sui_config["treasury_cap_id"]
-    gas_budget = sui_config.get("gas_budget", DEFAULT_GAS_BUDGET)
-    
-    command = [
-        sui_bin_path,
-        "client", "call",
-        "--package", package_id,
-        "--module", "suiboard_token",
-        "--function", "mint",
-        "--args",
-        treasury_cap_id,
-        str(amount),
-        recipient_address,
-        "--gas-budget", str(gas_budget),
-        "--json"
-    ]
-    command_str = " ".join(command)
-    logger.info(f"Executing SUI CLI command: {command_str}")
+def extract_transaction_hash(sui_output: str) -> str:
+    """SUI CLI 출력에서 트랜잭션 해시를 추출합니다"""
     try:
+        # JSON 파싱 시도
+        import json
+        output_json = json.loads(sui_output)
+        if "digest" in output_json:
+            return output_json["digest"]
+        elif "effects" in output_json and "transactionDigest" in output_json["effects"]:
+            return output_json["effects"]["transactionDigest"]
+    except:
+        # JSON 파싱 실패 시 정규식으로 해시 추출
+        import re
+        hash_match = re.search(r'(0x[a-fA-F0-9]{64})', sui_output)
+        if hash_match:
+            return hash_match.group(1)
+    
+    return None
+
+def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) -> str:
+    """SUIBOARD 토큰을 지급하고 발행량을 추적합니다."""
+    from core.database import DBConnect
+    from core.models import TokenSupply
+    from datetime import datetime
+    
+    # 발행량 제한 체크
+    db_connect = DBConnect()
+    db = db_connect.sessionLocal()
+    try:
+        supply_record = db.query(TokenSupply).first()
+        
+        if not supply_record:
+            # 최초 실행 시 토큰 공급량 기록 생성
+            supply_record = TokenSupply(
+                total_minted=0,
+                total_burned=0,
+                max_supply=100000000,  # 1억개 제한
+                last_updated=datetime.now(),
+                notes="Initial token supply record created"
+            )
+            db.add(supply_record)
+            db.commit()
+            logger.info("토큰 공급량 추적 테이블 초기화 완료")
+        
+        # 발행 가능 여부 확인
+        if not supply_record.can_mint(amount):
+            remaining = supply_record.remaining_supply
+            error_msg = f"토큰 발행 한도 초과: 요청량 {amount}, 남은 발행가능량 {remaining}, 최대공급량 {supply_record.max_supply}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        
+        # 실제 토큰 민팅 실행
+        logger.info(f"Attempting to award {amount} SUIBOARD tokens to {recipient_address}")
+        
+        # SUI CLI 명령 실행
+        command = [
+            sui_config.get("sui_bin_path", "sui"),
+            "client", "call",
+            "--package", sui_config["package_id"],
+            "--module", "suiboard_token",
+            "--function", "mint",
+            "--args",
+            sui_config["treasury_cap_id"],
+            str(amount),
+            recipient_address,
+            "--gas-budget", str(sui_config.get("gas_budget", 100000000))
+        ]
+        
         result = subprocess.run(command, capture_output=True, text=True, check=True)
-        logger.info(f"SUI CLI mint command output: {result.stdout}")
-        response_json = json.loads(result.stdout)
-        if "error" in response_json:
-            error_message = response_json.get("error", "Unknown SUI error from JSON response")
-            logger.error(f"SUI CLI mint call failed with error: {error_message}")
-            raise SuiInteractionError(f"SUI CLI mint call failed: {error_message}")
-        tx_digest = None
-        if "digest" in response_json:
-            tx_digest = response_json["digest"]
-        elif response_json.get("effects", {}).get("status", {}).get("status") == "success":
-            tx_digest = response_json.get("effects", {}).get("transactionDigest")
-        if not tx_digest:
-            logger.error(f"Could not extract transaction digest from SUI CLI mint response: {response_json}")
-            raise SuiInteractionError(f"Could not extract transaction digest from SUI CLI mint response. Response: {result.stdout}")
-        logger.info(f"Suiboard token award successful. Transaction Digest: {tx_digest}")
-        return tx_digest
+        
+        # 트랜잭션 해시 추출
+        tx_hash = extract_transaction_hash(result.stdout)
+        
+        if tx_hash:
+            # 발행량 업데이트
+            supply_record.total_minted += amount
+            supply_record.last_updated = datetime.now()
+            supply_record.notes = f"Minted {amount} tokens to {recipient_address}"
+            db.commit()
+            
+            logger.info(f"SUIBOARD 토큰 {amount}개 발행 완료: {recipient_address}, TX: {tx_hash}")
+            logger.info(f"총 발행량: {supply_record.total_minted}/{supply_record.max_supply}, 남은 발행가능량: {supply_record.remaining_supply}")
+            return tx_hash
+        else:
+            error_msg = f"트랜잭션 해시를 찾을 수 없음: {result.stdout}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
+            
     except subprocess.CalledProcessError as e:
-        logger.error(f"SUI CLI mint command failed. Return code: {e.returncode}, Stdout: {e.stdout}, Stderr: {e.stderr}")
-        raise SuiInteractionError(f"SUI CLI mint command execution failed: {e.stderr if e.stderr else e.stdout}")
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON response from SUI CLI mint: {e}, Raw output: {result.stdout}")
-        raise SuiInteractionError(f"Failed to decode SUI CLI mint JSON response: {result.stdout}")
+        error_msg = f"SUI CLI 명령 실패: {e.stderr}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
     except Exception as e:
-        logger.error(f"An unexpected error occurred during SUI token award: {e}")
-        raise SuiInteractionError(f"An unexpected error occurred during token award: {e}")
+        logger.error(f"토큰 지급 실패: {str(e)}")
+        raise
+    finally:
+        db.close()
 
 def reclaim_suiboard_token(amount_to_reclaim: int, sui_config: dict) -> str:
     logger.info(f"Attempting to reclaim (mint and burn) {amount_to_reclaim} Suiboard tokens.")
