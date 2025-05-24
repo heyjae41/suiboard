@@ -1223,7 +1223,7 @@ class Login(Base):
 
 class SuiTransactionlog(Base):
     """SUI 트랜잭션 로그"""
-    __tablename__ = "sui_transactionlog"
+    __tablename__ = DB_TABLE_PREFIX + "sui_transaction_log"
     
     stl_id = Column(Integer, primary_key=True, autoincrement=True)
     mb_id = Column(String(20), nullable=False, index=True, comment="회원 ID")
@@ -1242,7 +1242,7 @@ class SuiTransactionlog(Base):
 
 class TokenSupply(Base):
     """SUIBOARD 토큰 총 발행량 관리"""
-    __tablename__ = "token_supply"
+    __tablename__ = DB_TABLE_PREFIX + "token_supply"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     total_minted = Column(BIGINT, nullable=False, default=0, comment="총 발행량")
