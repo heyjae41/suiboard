@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ADMIN_THEME: str = "basic"  # 관리자 테마
     APP_IS_DEBUG: bool = False  # 디버그 모드
 
+    BASE_URL: str = "https://marketmaker.store"  # 기본 URL (예: https://marketmaker.store)
+    FORCE_HTTPS: bool = False  # HTTPS 강제 사용 여부 (Nginx에서 처리하므로 비활성화)
     COOKIE_DOMAIN: str = ""  # 쿠키 도메인
 
     # 데이터베이스 설정

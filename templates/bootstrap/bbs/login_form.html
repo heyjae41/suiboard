@@ -10,7 +10,7 @@
             <h2 class="col-6 text-center fs-4 fw-bold py-4"><span class="blind">회원</span>로그인</h2>
             <a href="/bbs/register" class="col-6 text-center bov-bg fs-4 sub-font text-decoration-none py-4">회원가입</a>
         </div>
-        <form name="flogin" action="/bbs/login" onsubmit="return flogin_submit(this);" method="post">
+        <form name="flogin" action="{{ url_for('login') }}" onsubmit="return flogin_submit(this);" method="post">
             <input type="hidden" name="url" value="{{ url }}">
             <fieldset id="login_fs" class="p-5">
                 <legend class="blind">회원로그인</legend>

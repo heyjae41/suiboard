@@ -111,6 +111,24 @@ async def main_middleware(request: Request, call_next):
     if not await should_run_middleware(request):
         return await call_next(request)
 
+    # 프록시 헤더 처리 (Nginx에서 전달된 HTTPS 정보 인식)
+    if "x-forwarded-proto" in request.headers:
+        forwarded_proto = request.headers["x-forwarded-proto"]
+        if forwarded_proto == "https":
+            # HTTPS 요청으로 인식하도록 URL 스키마 업데이트
+            request.scope["scheme"] = "https"
+
+    # HTTPS 강제 리다이렉트 (프로덕션 환경에서만)
+    if settings.FORCE_HTTPS and request.url.scheme == "http":
+        # 관리자 페이지나 API 요청만 HTTPS로 리다이렉트 (POST 요청 제외)
+        if request.url.path.startswith(("/admin", "/api")) and request.method == "GET":
+            https_url = request.url.replace(scheme="https")
+            return RedirectResponse(url=str(https_url), status_code=301)
+        # 일반 GET 요청도 HTTPS로 리다이렉트 (선택사항)
+        # if request.method == "GET":
+        #     https_url = request.url.replace(scheme="https")
+        #     return RedirectResponse(url=str(https_url), status_code=301)
+
     # 데이터베이스 설치여부 체크
     with DBConnect().sessionLocal() as db:
         url_path = request.url.path

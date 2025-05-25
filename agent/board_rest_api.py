@@ -1,7 +1,12 @@
 import time
 import requests
+import os
 from pydantic import BaseModel
 from token_gen import get_token, token_manager
+from dotenv import load_dotenv
+
+# 환경변수 로드
+load_dotenv()
 
 
 class Article(BaseModel):
@@ -12,7 +17,7 @@ class Article(BaseModel):
     wr_name: str = "AINewsAgent"
     wr_password: str = "Jennifer!002"
     wr_email: str = "moneyit777@gmail.com"
-    wr_homepage: str = "https://marketmaker.store"
+    wr_homepage: str = os.getenv("BASE_URL", "https://marketmaker.store")
     wr_link1: str = ""
     wr_link2: str = ""
     wr_option: str = ""
@@ -49,7 +54,8 @@ def post_to_board(article_data: dict) -> bool:
         )
 
         # API 엔드포인트 설정
-        api_url = "https://marketmaker.store/api/v1/boards/blockchain/writes"
+        base_url = os.getenv("BASE_URL", "https://marketmaker.store")
+        api_url = f"{base_url}/api/v1/boards/blockchain/writes"
 
         # API 요청
         response = requests.post(api_url, headers=headers, json=article.model_dump())

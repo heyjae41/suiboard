@@ -5,6 +5,9 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 
+# 환경변수 로드
+load_dotenv()
+
 
 class TokenResponse(BaseModel):
     """토큰 응답 모델"""
@@ -20,7 +23,9 @@ class TokenManager:
     """토큰 관리 클래스"""
 
     def __init__(self):
-        self.base_url = "https://marketmaker.store/api/v1"
+        # 환경변수에서 BASE_URL을 가져오고, 없으면 기본값 사용
+        base_url = os.getenv("BASE_URL", "https://marketmaker.store")
+        self.base_url = f"{base_url}/api/v1"
         self.token_data: Optional[TokenResponse] = None
 
     def get_access_token(self, username: str, password: str) -> Optional[TokenResponse]:
