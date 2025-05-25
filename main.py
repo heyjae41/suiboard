@@ -213,50 +213,7 @@ async def main_middleware(request: Request, call_next):
                     ymd_str,
                 )
 
-                # SUIBOARD 토큰 로그인 보상 지급 (일반 회원만, 에이전트 제외)
-                if not member.mb_id.startswith('gg_') and member.mb_sui_address:
-                    try:
-                        token_amount = 2  # 로그인 보상
-                        
-                        # 실제 SUIBOARD 토큰 지급
-                        tx_hash = award_suiboard_token(
-                            recipient_address=member.mb_sui_address,
-                            amount=token_amount,
-                            sui_config=DEFAULT_SUI_CONFIG
-                        )
-                        
-                        # 트랜잭션 로그 저장
-                        from core.models import SuiTransactionlog
-                        sui_log = SuiTransactionlog(
-                            mb_id=member.mb_id,
-                            wr_id=None,
-                            bo_table=None,
-                            stl_amount=token_amount,
-                            stl_reason="daily_login",
-                            stl_tx_hash=tx_hash,
-                            stl_status="success",
-                            stl_datetime=datetime.now(),
-                            stl_error_message=None
-                        )
-                        db.add(sui_log)
-                        print(f"SUIBOARD 토큰 로그인 보상 {token_amount} 지급 완료: {member.mb_id}, TX: {tx_hash}")
-                        
-                    except Exception as e:
-                        print(f"SUIBOARD 토큰 로그인 보상 지급 실패: {member.mb_id}, 오류: {str(e)}")
-                        # 실패 로그 저장
-                        from core.models import SuiTransactionlog
-                        sui_log = SuiTransactionlog(
-                            mb_id=member.mb_id,
-                            wr_id=None,
-                            bo_table=None,
-                            stl_amount=2,
-                            stl_reason="daily_login",
-                            stl_tx_hash=None,
-                            stl_status="failed",
-                            stl_datetime=datetime.now(),
-                            stl_error_message=str(e)
-                        )
-                        db.add(sui_log)
+                # SUIBOARD 토큰 로그인 보상은 bbs/login.py에서 처리하므로 여기서는 제거
 
                 member.mb_today_login = datetime.now()
                 member.mb_login_ip = request.client.host

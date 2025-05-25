@@ -38,7 +38,7 @@ class SuiTokenService:
         existing_log = self.db.scalar(
             select(SuiTransactionlog).where(
                 SuiTransactionlog.mb_id == member.mb_id,
-                SuiTransactionlog.stl_reason == "login_bonus",
+                SuiTransactionlog.stl_reason == "daily_login",
                 func.date(SuiTransactionlog.stl_datetime) == today
             ).limit(1)
         )
@@ -47,24 +47,32 @@ class SuiTokenService:
             print(f"SuiTokenService: Login tokens already awarded to {member.mb_id} today ({today}).")
             return True # Or False if we want to indicate no new tokens were awarded
 
-        # Placeholder for actual SUI token transfer logic
-        # In a real implementation, this would call a function that interacts with the SUI blockchain.
-        # tx_hash = await transfer_suiboard_tokens(member.mb_sui_address, amount)
-        # For now, we simulate a successful transfer and generate a dummy tx_hash.
+        # 실제 SUI 토큰 지급 로직
         print(f"SuiTokenService: Attempting to transfer {amount} SUIBOARD tokens to {member.mb_sui_address} for member {member.mb_id}.")
-        simulated_tx_hash = f"simulated_tx_{datetime.datetime.now().isoformat().replace(':', '-')}_{member.mb_id}"
-        sui_transfer_successful = True # Assume success for now
+        
+        try:
+            from lib.sui_service import award_suiboard_token, DEFAULT_SUI_CONFIG
+            tx_hash = award_suiboard_token(
+                recipient_address=member.mb_sui_address,
+                amount=amount,
+                sui_config=DEFAULT_SUI_CONFIG
+            )
+            sui_transfer_successful = True
+        except Exception as e:
+            print(f"SuiTokenService: SUI token transfer failed for {member.mb_id}: {e}")
+            tx_hash = None
+            sui_transfer_successful = False
         
         if sui_transfer_successful:
-            print(f"SuiTokenService: Simulated SUI token transfer successful. TxHash: {simulated_tx_hash}")
+            print(f"SuiTokenService: SUI token transfer successful. TxHash: {tx_hash}")
             try:
                 new_token_log = SuiTransactionlog(
                     mb_id=member.mb_id,
                     wr_id=None,  # No post associated with login bonus
                     bo_table=None,  # No board associated with login bonus
                     stl_amount=amount,
-                    stl_reason="login_bonus",
-                    stl_tx_hash=simulated_tx_hash,
+                    stl_reason="daily_login",
+                    stl_tx_hash=tx_hash,
                     stl_status="success",
                     stl_datetime=datetime.datetime.now(),
                     stl_error_message=None
@@ -80,7 +88,24 @@ class SuiTokenService:
                 return False
         else:
             print(f"SuiTokenService: SUI token transfer failed for {member.mb_id}.")
-            # Log the failure if necessary
+            # 실패 로그 저장
+            try:
+                failed_token_log = SuiTransactionlog(
+                    mb_id=member.mb_id,
+                    wr_id=None,
+                    bo_table=None,
+                    stl_amount=amount,
+                    stl_reason="daily_login",
+                    stl_tx_hash=None,
+                    stl_status="failed",
+                    stl_datetime=datetime.datetime.now(),
+                    stl_error_message=str(e) if 'e' in locals() else "Unknown error"
+                )
+                self.db.add(failed_token_log)
+                self.db.commit()
+            except Exception as log_error:
+                print(f"SuiTokenService: Error logging failed token transfer for {member.mb_id}: {log_error}")
+                self.db.rollback()
             return False
 
 # Note: The SuiTokenLog model needs to be defined in core/models.py
