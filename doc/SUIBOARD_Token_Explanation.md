@@ -273,4 +273,204 @@ DEFAULT_WALRUS_CONFIG = {
 사용자가 지갑에서 토큰 확인 가능
        ↓
 게시글은 Walrus에서 영구 보존
-``` 
+```
+
+## 10. 문제 해결 과정 및 현재 상황 (2025년 5월)
+
+### 🚨 **발견된 문제들**
+
+#### A. 글쓰기 시 SUI 토큰 지급 실패
+- **증상**: 글은 정상 작성되지만 `g6_sui_transaction_log`와 `g6_point` 테이블에 데이터 없음
+- **원인**: 여러 복합적 문제
+
+#### B. Walrus 저장 실패
+- **증상**: "JSON 파싱 오류" 발생
+- **원인**: API 엔드포인트 문제
+
+### 🔧 **해결 과정**
+
+#### 1단계: 파일명 충돌 해결
+```bash
+# 문제: lib/token.py가 Python 표준 라이브러리와 충돌
+mv lib/token.py lib/session_token.py
+
+# 관련 import 구문 모두 수정
+- from lib.token import ...
++ from lib.session_token import ...
+```
+
+**수정된 파일들:**
+- `main.py`
+- `service/ajax/ajax.py` 
+- `lib/dependency/dependencies.py`
+- `bbs/password.py`
+
+#### 2단계: SUI 서비스 개선
+```python
+# lib/sui_service.py 개선사항
+- Windows 환경변수 처리 개선 (%USERNAME% → 실제 환경변수)
+- 입력 검증 강화 (주소 형식, 양수 체크)
+- 에러 처리 개선 및 JSON 응답 파싱 로직 추가
+- 트랜잭션 해시 추출 함수 개선
+```
+
+#### 3단계: 토큰 지급 조건 수정
+```python
+# service/board/create_post.py의 add_point 메서드
+# 기존: 에이전트 제외 조건
+is_not_agent = not (self.member.mb_id.startswith('gg_') or 'Agent' in self.member.mb_id)
+
+# 수정: 에이전트도 토큰 받을 수 있도록 조건 제거
+# 최종 조건: 답글이 아니고 SUI 주소가 있는 경우만
+```
+
+#### 4단계: 구문 오류 수정
+```python
+# service/board/delete_post.py 277번째 줄
+# 기존 (오류)
+self.point_service.save_point(self.request, self.comment.mb_id, ...)
+
+# 수정
+self.point_service.save_point(self.comment.mb_id, ...)
+```
+
+#### 5단계: Walrus 엔드포인트 업데이트
+```python
+# 기존 (작동하지 않음)
+DEFAULT_WALRUS_CONFIG = {
+    "publisher_url": "https://publisher.walrus-testnet.walrus.space",
+    "aggregator_url": "https://aggregator.walrus-testnet.walrus.space",
+}
+
+# 시도한 엔드포인트들
+# 1. 메인넷 URL (DNS 해결 실패)
+"publisher_url": "https://publisher.walrus.space"
+"aggregator_url": "https://aggregator.walrus.space"
+
+# 2. Staketab 제공 엔드포인트 (404 오류)
+"publisher_url": "https://wal-publisher-testnet.staketab.org/v1/api"
+"aggregator_url": "https://wal-aggregator-testnet.staketab.org/v1/api"
+```
+
+#### 6단계: Walrus 기능 임시 비활성화
+```python
+# lib/walrus_service.py
+DEFAULT_WALRUS_CONFIG = {
+    "publisher_url": "https://wal-publisher-testnet.staketab.org/v1/api",
+    "aggregator_url": "https://wal-aggregator-testnet.staketab.org/v1/api", 
+    "sui_bin_path": DEFAULT_SUI_BIN_PATH,
+    "storage_package_id": "0x1fad2576bf6359f0fafc8c089723c80fed4784f5e3ee508b037c5280f91e543f",
+    "gas_budget": 100000000,
+    "enabled": False  # 🚨 Walrus 기능 임시 비활성화
+}
+
+# store_post_on_walrus 함수에 체크 로직 추가
+def store_post_on_walrus(...):
+    if not walrus_config.get("enabled", True):
+        logger.info("Walrus 저장 기능이 비활성화되어 있습니다.")
+        return None
+```
+
+### ✅ **최종 해결 결과**
+
+#### 데이터베이스 확인 결과:
+```sql
+-- 포인트 지급 확인
+SELECT * FROM g6_point WHERE po_content LIKE '%StockAI%' ORDER BY po_datetime DESC LIMIT 5;
+-- 결과: ID 75, 5포인트, "StockAI 20 글쓰기", 2025-05-25 07:07:46
+
+-- SUIBOARD 토큰 지급 확인  
+SELECT * FROM g6_sui_transaction_log ORDER BY stl_datetime DESC LIMIT 5;
+-- 결과: ID 13, 1토큰, "post_creation", 상태: success, 2025-05-25 16:07:49
+```
+
+#### 수정된 토큰 지급 조건:
+1. ✅ 회원이어야 함
+2. ✅ 답글이 아닌 원글이어야 함  
+3. ✅ SUI 주소가 있어야 함
+4. ~~❌ 에이전트 제외 조건~~ (제거됨)
+
+### 🔄 **현재 상황 및 향후 계획**
+
+#### 현재 상태:
+- **SUI 토큰 지급**: ✅ 정상 작동
+- **포인트 지급**: ✅ 정상 작동  
+- **Walrus 저장**: ✅ 최신 설정으로 재활성화 완료
+- **게시글 작성**: ✅ 정상 작동
+
+#### 🚀 **Walrus 최신 업데이트 (2025년 5월)**
+
+##### 1. 최신 Walrus 테스트넷 정보
+```python
+# 최신 설정 (lib/walrus_service.py)
+DEFAULT_WALRUS_CONFIG = {
+    # 최신 Walrus 테스트넷 설정 (2025년 5월 기준)
+    "package_id": "0xdf9033cac39b7a9b9f76fb6896c9fc5283ba730d6976a2b1d85ad1e6036c3272",  # 최신 패키지 ID
+    "sui_rpc_url": "https://fullnode.testnet.sui.io:443",  # Sui 테스트넷 RPC URL
+    "sui_bin_path": DEFAULT_SUI_BIN_PATH,
+    "walrus_binary": "walrus",  # Walrus CLI 바이너리 경로
+    "gas_budget": 500000000,  # 공식 권장 가스 예산
+    "enabled": True,  # 최신 설정으로 재활성화
+}
+```
+
+##### 2. 주요 변경사항
+- **REST API → CLI 방식**: 기존 REST API 엔드포인트 방식에서 Walrus CLI 사용 방식으로 변경
+- **패키지 ID 업데이트**: `0x1fad...` → `0xdf90...` (최신 공식 패키지)
+- **RPC URL 통합**: Sui 테스트넷 RPC URL로 통합 (`https://fullnode.testnet.sui.io:443`)
+- **가스 예산 증가**: 100M → 500M (공식 권장사항)
+
+##### 3. 새로운 저장/조회 방식
+```bash
+# 저장
+walrus store <파일경로> --rpc-url https://fullnode.testnet.sui.io:443 --json
+
+# 조회  
+walrus read <blob_id> --rpc-url https://fullnode.testnet.sui.io:443 --json
+```
+
+##### 4. 하위 호환성 유지
+- 기존 REST API 방식도 지원 (레거시 설정 감지 시 자동 전환)
+- 기존 blob_id들은 계속 사용 가능
+
+##### 5. Walrus CLI 설치 방법
+```bash
+# 공식 설치 가이드
+# https://docs.walrus.site/walrus-sites/tutorial.html
+
+# 또는 바이너리 다운로드
+curl -L https://github.com/MystenLabs/walrus/releases/latest/download/walrus-linux-x64 -o walrus
+chmod +x walrus
+```
+
+##### 6. 테스트 방법
+```bash
+# SUIBOARD 프로젝트 루트에서 실행
+python test_walrus.py
+
+# 예상 출력:
+# ✅ Sui RPC 연결 성공
+# ✅ Walrus CLI 설치 확인
+# ✅ 데이터 저장 성공
+# ✅ 데이터 조회 성공
+```
+
+##### 7. 모니터링 및 유지보수
+- 로그를 통해 토큰 지급 상태 지속 확인
+- Walrus CLI 버전 업데이트 모니터링
+- 새로운 패키지 ID 정보 업데이트
+
+### 🎉 **성과**
+
+이제 `AINewsAgent`를 포함한 모든 회원이 글 작성 시:
+- **포인트 5점** 정상 지급 ✅
+- **SUIBOARD 토큰 1개** 정상 지급 ✅
+- **게시글 작성** 정상 동작 ✅
+- **Walrus 오류 시에도 시스템 중단 없음** ✅
+
+### 📚 **참고 자료**
+
+- [Walrus 공식 문서](https://docs.walrus.site)
+- [Walrus GitHub](https://github.com/MystenLabs/walrus)
+- [Blockberry API - Walrus 노드](https://docs.blockberry.one/reference/walrus-nodes)
+- [Walrus 메인넷 런칭 공지](https://www.mystenlabs.com/blog/walrus-public-testnet-launches-redefining-decentralized-data-storage) 
