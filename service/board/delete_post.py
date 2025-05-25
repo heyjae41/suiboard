@@ -275,7 +275,7 @@ class DeleteCommentService(DeletePostService):
         # 댓글 포인트 회수 (SUI 토큰 회수는 댓글에 대해선 현재 미구현)
         if self.comment.mb_id and self.board.bo_comment_point:
             if not self.point_service.delete_point(self.comment.mb_id, self.bo_table, self.comment.wr_id, "댓글"):
-                self.point_service.save_point(self.request, self.comment.mb_id, self.board.bo_comment_point * (-1),
+                self.point_service.save_point(self.comment.mb_id, self.board.bo_comment_point * (-1),
                                                 f"{self.board.bo_subject} {self.comment.wr_id} 댓글 삭제")
 
         db.delete(self.comment)

@@ -52,15 +52,30 @@ class CreatePostService(BoardService):
 
     def add_point(self, write, parent_write: WriteBaseModel = None):
         """포인트 추가 및 SUI 토큰 지급"""
+        logger.info(f"=== add_point 호출됨 ===")
+        logger.info(f"회원 ID: {self.member.mb_id if self.member else 'None'}")
+        logger.info(f"parent_write: {parent_write is not None}")
+        
         if self.member.mb_id:
             point = self.board.bo_comment_point if parent_write else self.board.bo_write_point
             content = f"{self.board.bo_subject} {write.wr_id} 글" + ("답변" if parent_write else "쓰기")
+            logger.info(f"포인트 지급: {self.member.mb_id}, {point}점, {content}")
             self.point_service.save_point(self.member.mb_id, point, content,
                                           self.bo_table, write.wr_id, "쓰기")
             
-            # SUIBOARD 토큰 지급 (일반 회원만, 에이전트 제외)
-            if not parent_write and not self.member.mb_id.startswith('gg_') and self.member.mb_sui_address:
+            # SUIBOARD 토큰 지급 조건 체크
+            is_not_reply = not parent_write
+            has_sui_address = bool(self.member.mb_sui_address)
+            
+            logger.info(f"토큰 지급 조건 체크:")
+            logger.info(f"  - 답글이 아님: {is_not_reply}")
+            logger.info(f"  - SUI 주소 있음: {has_sui_address}")
+            logger.info(f"  - SUI 주소: {self.member.mb_sui_address}")
+            
+            # SUIBOARD 토큰 지급 (답글이 아니고 SUI 주소가 있는 경우)
+            if is_not_reply and has_sui_address:
                 try:
+                    logger.info(f"SUIBOARD 토큰 지급 시작: {self.member.mb_id}")
                     sui_token_service = SuiTokenService(self.request, self.db)
                     token_amount = 1  # 게시글 작성 보상
                     
@@ -103,6 +118,10 @@ class CreatePostService(BoardService):
                         stl_error_message=str(e)
                     )
                     self.db.add(sui_log)
+            else:
+                logger.info(f"SUIBOARD 토큰 지급 조건 불만족으로 건너뜀: {self.member.mb_id}")
+        else:
+            logger.info("회원이 아니므로 포인트/토큰 지급 건너뜀")
 
     def save_write(self, parent_id, data: Union[WriteForm, WriteModel]):
         """게시글을 저장"""
