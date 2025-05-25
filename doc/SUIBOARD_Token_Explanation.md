@@ -395,7 +395,7 @@ SELECT * FROM g6_sui_transaction_log ORDER BY stl_datetime DESC LIMIT 5;
 #### 현재 상태:
 - **SUI 토큰 지급**: ✅ 정상 작동
 - **포인트 지급**: ✅ 정상 작동  
-- **Walrus 저장**: ✅ 최신 설정으로 재활성화 완료
+- **Walrus 저장**: ⚠️ Ubuntu 20.04 호환성 문제로 비활성화
 - **게시글 작성**: ✅ 정상 작동
 
 #### 🚀 **Walrus 최신 업데이트 (2025년 5월)**
@@ -455,9 +455,26 @@ python test_walrus.py
 # ✅ 데이터 조회 성공
 ```
 
-##### 7. 모니터링 및 유지보수
+##### 7. Ubuntu 20.04 호환성 문제
+```bash
+# 현재 서버 환경
+Ubuntu 20.04.6 LTS (Focal Fossa)
+GLIBC 2.31
+
+# Walrus 바이너리 요구사항
+GLIBC 2.32/2.33/2.34 이상
+GLIBCXX_3.4.29/30 이상
+
+# 해결 방안
+1. Ubuntu 22.04 LTS 이상으로 업그레이드 (권장)
+2. Docker 컨테이너 사용
+3. 소스 코드에서 직접 빌드
+4. 현재 상태 유지 (Walrus 비활성화)
+```
+
+##### 8. 모니터링 및 유지보수
 - 로그를 통해 토큰 지급 상태 지속 확인
-- Walrus CLI 버전 업데이트 모니터링
+- 서버 OS 업그레이드 시 Walrus 재활성화
 - 새로운 패키지 ID 정보 업데이트
 
 ### 🎉 **성과**

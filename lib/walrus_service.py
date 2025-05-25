@@ -17,7 +17,7 @@ DEFAULT_WALRUS_CONFIG = {
     "sui_bin_path": DEFAULT_SUI_BIN_PATH,
     "walrus_binary": "walrus.exe" if os.name == 'nt' else "walrus",  # Walrus CLI 바이너리 경로 (Windows/Linux)
     "gas_budget": 500000000,  # 공식 권장 가스 예산
-    "enabled": False,  # Walrus CLI 설치 후 True로 변경. 현재 서버가 Ubuntu 20이어서 비활성화. 최소 22 이상이어야 함
+    "enabled": False,  # Walrus CLI 설치 후 True로 변경. 현재 서버가 Ubuntu 20이어서 비활성화. 최소 22 이상이어야 함. 현재 서버가 Ubuntu 20이어서 비활성화. 최소 22 이상이어야 함
     
     # 레거시 설정 (하위 호환성을 위해 유지)
     "storage_package_id": "0xdf9033cac39b7a9b9f76fb6896c9fc5283ba730d6976a2b1d85ad1e6036c3272",
