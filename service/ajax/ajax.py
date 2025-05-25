@@ -9,7 +9,7 @@ from core.formclass import AutoSaveForm
 from core.models import Board, Member, WriteBaseModel, BoardGood, AutoSave
 from core.exception import JSONException
 from lib.common import dynamic_create_write_table, get_unique_id
-from lib.token import check_token
+from lib.session_token import check_token
 from api.v1.models.ajax import AutoSaveModel, responses
 
 

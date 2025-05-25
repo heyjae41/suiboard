@@ -11,7 +11,7 @@ from core.template import UserTemplates
 from lib.dependency.board import get_write
 from lib.dependency.dependencies import validate_token
 from lib.pbkdf2 import validate_password
-from lib.token import create_session_token
+from lib.session_token import create_session_token
 
 router = APIRouter()
 templates = UserTemplates()

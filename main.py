@@ -41,7 +41,7 @@ from lib.common import (
 from lib.dependency.dependencies import check_use_template
 from lib.member import is_super_admin
 from lib.scheduler import scheduler
-from lib.token import create_session_token
+from lib.session_token import create_session_token
 from service.member_service import MemberService
 from service.point_service import PointService
 from service.visit_service import VisitService

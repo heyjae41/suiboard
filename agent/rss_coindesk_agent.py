@@ -3,16 +3,36 @@ import feedparser
 import datetime
 import os
 import sys
+import logging
 from bs4 import BeautifulSoup # To clean up HTML content from RSS summary
+
+# 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),  # 콘솔 출력
+        logging.FileHandler('agent/logs/rss_coindesk_agent.log', encoding='utf-8')  # 파일 출력
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Add project root to sys.path to allow importing project modules
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(PROJECT_ROOT)
 
-from sqlalchemy.orm import Session
-from core.database import db_connect
-from service.agent_service import create_post_by_agent
-from core.models import Member, Board # To check/create agent member and board
+logger.info(f"프로젝트 루트 경로: {PROJECT_ROOT}")
+logger.info(f"sys.path에 추가됨: {PROJECT_ROOT}")
+
+try:
+    from sqlalchemy.orm import Session
+    from core.database import db_connect
+    from service.agent_service import create_post_by_agent
+    from core.models import Member, Board # To check/create agent member and board
+    logger.info("모든 모듈 임포트 성공")
+except ImportError as e:
+    logger.error(f"모듈 임포트 실패: {e}")
+    sys.exit(1)
 
 # Configuration
 COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss/"
@@ -33,7 +53,7 @@ def ensure_agent_setup(db: Session):
     # 1. Ensure agent member exists
     agent_member = db.query(Member).filter(Member.mb_id == AGENT_MEMBER_ID).first()
     if not agent_member:
-        print(f"Agent member {AGENT_MEMBER_ID} not found. Creating...")
+        logger.info(f"에이전트 멤버 {AGENT_MEMBER_ID}를 찾을 수 없습니다. 생성 중...")
         new_agent = Member(
             mb_id=AGENT_MEMBER_ID,
             mb_password="!impossible_password_hash", 
@@ -53,28 +73,31 @@ def ensure_agent_setup(db: Session):
         )
         db.add(new_agent)
         db.commit()
-        print(f"Agent member {AGENT_MEMBER_ID} created.")
+        logger.info(f"에이전트 멤버 {AGENT_MEMBER_ID} 생성 완료.")
     else:
-        print(f"Agent member {AGENT_MEMBER_ID} found.")
+        logger.info(f"에이전트 멤버 {AGENT_MEMBER_ID}를 찾았습니다.")
 
     # 2. Ensure target board exists (assuming it should be pre-created by an admin)
     target_board = db.query(Board).filter(Board.bo_table == BOARD_TABLE_NAME).first()
     if not target_board:
-        print(f"Error: Board '{BOARD_TABLE_NAME}' not found. Please create it manually.")
+        logger.warning(f"게시판 '{BOARD_TABLE_NAME}'을 찾을 수 없습니다. 수동으로 생성해주세요.")
         # Depending on policy, could raise an error or attempt to create a basic board.
         # For now, we let create_post_by_agent handle the board not found error if it occurs.
         pass
     else:
-        print(f"Target board '{BOARD_TABLE_NAME}' found.")
+        logger.info(f"대상 게시판 '{BOARD_TABLE_NAME}'을 찾았습니다.")
 
 # --- RSS Parsing Logic --- #
 def parse_coindesk_rss():
     articles = []
     try:
+        logger.info(f"RSS 피드 파싱 시작: {COINDESK_RSS_URL}")
         feed = feedparser.parse(COINDESK_RSS_URL)
         if feed.bozo:
-            print(f"Warning: RSS feed is ill-formed. Bozo exception: {feed.bozo_exception}")
+            logger.warning(f"RSS 피드가 잘못된 형식입니다. Bozo exception: {feed.bozo_exception}")
 
+        logger.info(f"RSS 피드에서 {len(feed.entries)}개의 항목을 찾았습니다.")
+        
         for entry in feed.entries[:5]: # Get top 5 entries
             title = entry.get("title", "No Title")
             link = entry.get("link", "")
@@ -108,28 +131,33 @@ def parse_coindesk_rss():
                 "content": content_text, # Use cleaned text content
                 "published_date": published_time
             })
-            print(f"Parsed from RSS: {title}")
+            logger.info(f"RSS에서 파싱됨: {title}")
             
     except Exception as e:
-        print(f"An error occurred during RSS parsing: {e}")
+        logger.error(f"RSS 파싱 중 오류 발생: {e}", exc_info=True)
     
     return articles
 
 # --- Main Agent Logic --- #
 if __name__ == "__main__":
-    print(f"Starting Coindesk RSS Agent at {datetime.datetime.now()}...")
-    db_session_gen = get_db()
-    db = next(db_session_gen)
-
+    logger.info(f"Starting Coindesk RSS Agent at {datetime.datetime.now()}...")
+    
     try:
+        logger.info("데이터베이스 연결 시도 중...")
+        db_session_gen = get_db()
+        db = next(db_session_gen)
+        logger.info("데이터베이스 연결 성공")
+
+        logger.info("에이전트 설정 확인 중...")
         ensure_agent_setup(db) # Ensure agent member and board (check) are ready
         
+        logger.info("Coindesk RSS 파싱 시작...")
         parsed_articles = parse_coindesk_rss()
         
         if not parsed_articles:
-            print("No articles parsed from RSS. Exiting.")
+            logger.warning("RSS에서 파싱된 기사가 없습니다. 종료합니다.")
         else:
-            print(f"Successfully parsed {len(parsed_articles)} articles. Posting to board '{BOARD_TABLE_NAME}'...")
+            logger.info(f"성공적으로 {len(parsed_articles)}개의 기사를 파싱했습니다. '{BOARD_TABLE_NAME}' 게시판에 포스팅 중...")
 
         for article_data in parsed_articles:
             try:
@@ -137,7 +165,7 @@ if __name__ == "__main__":
                 # This check is omitted for brevity here.
                 
                 article_title = article_data['title']
-                print(f"Posting article: {article_title}")
+                logger.info(f"기사 포스팅 중: {article_title}")
                 
                 # Prepare content. If original content was HTML and you want to keep it:
                 # wr_option="html1", and pass the HTML content to wr_content.
@@ -153,17 +181,20 @@ if __name__ == "__main__":
                     # wr_option="html1", # Uncomment if content is HTML and should be rendered as such
                     wr_ip = "127.0.0.1" # Placeholder IP for agent
                 )
-                print(f"Successfully posted article ID: {new_post.wr_id}, Title: {new_post.wr_subject}")
+                logger.info(f"기사 포스팅 성공 - ID: {new_post.wr_id}, 제목: {new_post.wr_subject}")
                 # Point and SUI token logic is handled within create_post_by_agent / insert_point
 
             except Exception as e:
                 article_title = article_data.get('title', 'Unknown')
-                print(f"Error posting article '{article_title}' from RSS: {e}")
-                # Log this error
+                logger.error(f"기사 포스팅 실패 '{article_title}': {e}", exc_info=True)
     
     except Exception as e:
-        print(f"An error occurred in the Coindesk agent's main loop: {e}")
+        logger.error(f"Coindesk 에이전트 메인 루프에서 오류 발생: {e}", exc_info=True)
 
     finally:
-        print(f"Coindesk RSS Agent finished at {datetime.datetime.now()}.")
-        db.close() 
+        try:
+            db.close()
+            logger.info("데이터베이스 연결 종료")
+        except:
+            pass
+        logger.info(f"Coindesk RSS Agent finished at {datetime.datetime.now()}.") 

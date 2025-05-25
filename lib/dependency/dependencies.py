@@ -16,7 +16,7 @@ from lib.captcha import get_current_captcha_cls
 from lib.common import get_client_ip, get_current_admin_menu_id
 from lib.dependency.auth import get_login_member_optional
 from lib.member import get_admin_type
-from lib.token import check_token
+from lib.session_token import check_token
 from service.current_connect_service import CurrentConnectService
 from service.menu_service import MenuService
 from service.poll_service import PollService

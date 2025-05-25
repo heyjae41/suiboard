@@ -3,13 +3,75 @@ import subprocess
 import json
 import logging
 import re # For extracting object ID
+import os
+import platform
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-DEFAULT_SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"
+def get_default_sui_bin_path():
+    """OS에 따라 기본 SUI CLI 경로를 반환합니다."""
+    system = platform.system().lower()
+    
+    if system == "windows":
+        # Windows 환경에서 일반적인 SUI CLI 경로들
+        username = os.environ.get('USERNAME', 'User')
+        possible_paths = [
+            "C:\\ProgramData\\chocolatey\\bin\\sui.exe",
+            f"C:\\Users\\{username}\\AppData\\Local\\Programs\\sui\\sui.exe",
+            "sui.exe"  # PATH에 등록된 경우
+        ]
+    elif system == "linux":
+        # Linux 환경에서 일반적인 SUI CLI 경로들
+        possible_paths = [
+            "/home/linuxbrew/.linuxbrew/bin/sui",
+            "/usr/local/bin/sui",
+            "/usr/bin/sui",
+            "sui"  # PATH에 등록된 경우
+        ]
+    elif system == "darwin":  # macOS
+        # macOS 환경에서 일반적인 SUI CLI 경로들
+        possible_paths = [
+            "/opt/homebrew/bin/sui",
+            "/usr/local/bin/sui",
+            "sui"  # PATH에 등록된 경우
+        ]
+    else:
+        # 기타 OS의 경우 PATH에서 찾기
+        possible_paths = ["sui"]
+    
+    # 실제로 존재하는 경로 찾기
+    for path in possible_paths:
+        try:
+            # PATH에 등록된 경우 (sui, sui.exe)
+            if path in ["sui", "sui.exe"]:
+                result = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    logger.info(f"SUI CLI found in PATH: {path}")
+                    return path
+            # 절대 경로인 경우
+            elif os.path.exists(path):
+                logger.info(f"SUI CLI found at: {path}")
+                return path
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    # 찾지 못한 경우 기본값 반환
+    default_path = "sui.exe" if system == "windows" else "sui"
+    logger.warning(f"SUI CLI not found in common locations. Using default: {default_path}")
+    return default_path
+
+def get_default_mint_address():
+    """기본 민트 주소를 동적으로 가져옵니다."""
+    try:
+        sui_bin_path = get_default_sui_bin_path()
+        return _get_active_sui_address(sui_bin_path)
+    except Exception as e:
+        logger.warning(f"Failed to get active address, using fallback: {e}")
+        return "0xcfd7707740d1e2a7ea3a3d70128d38ced43d59625354b78cb6f3c8794d952264"
+
+DEFAULT_SUI_BIN_PATH = get_default_sui_bin_path()
 DEFAULT_GAS_BUDGET = 100000000 
-DEFAULT_MINT_TO_ADDRESS_FOR_BURN = "0xcfd7707740d1e2a7ea3a3d70128d38ced43d59625354b78cb6f3c8794d952264" # Placeholder, will try to get active address
 
 # Default SUI configuration
 DEFAULT_SUI_CONFIG = {
@@ -42,21 +104,48 @@ def _get_active_sui_address(sui_bin_path: str) -> str:
 
 def extract_transaction_hash(sui_output: str) -> str:
     """SUI CLI 출력에서 트랜잭션 해시를 추출합니다"""
+    if not sui_output:
+        logger.warning("Empty SUI output provided for hash extraction")
+        return None
+        
     try:
         # JSON 파싱 시도
-        import json
         output_json = json.loads(sui_output)
-        if "digest" in output_json:
-            return output_json["digest"]
-        elif "effects" in output_json and "transactionDigest" in output_json["effects"]:
-            return output_json["effects"]["transactionDigest"]
-    except:
-        # JSON 파싱 실패 시 정규식으로 해시 추출
-        import re
-        hash_match = re.search(r'(0x[a-fA-F0-9]{64})', sui_output)
-        if hash_match:
-            return hash_match.group(1)
+        
+        # 다양한 JSON 구조에서 해시 찾기
+        hash_locations = [
+            output_json.get("digest"),
+            output_json.get("effects", {}).get("transactionDigest"),
+            output_json.get("transactionDigest"),
+            output_json.get("result", {}).get("digest")
+        ]
+        
+        for hash_value in hash_locations:
+            if hash_value and isinstance(hash_value, str) and hash_value.startswith("0x") and len(hash_value) == 66:
+                logger.debug(f"Transaction hash extracted from JSON: {hash_value}")
+                return hash_value
+                
+    except json.JSONDecodeError:
+        logger.debug("JSON parsing failed, attempting regex extraction")
+    except Exception as e:
+        logger.warning(f"Unexpected error during JSON parsing: {e}")
     
+    # JSON 파싱 실패 시 정규식으로 해시 추출
+    hash_patterns = [
+        r'Transaction Digest:\s*(0x[a-fA-F0-9]{64})',
+        r'digest["\']?\s*:\s*["\']?(0x[a-fA-F0-9]{64})',
+        r'(0x[a-fA-F0-9]{64})'  # 일반적인 해시 패턴
+    ]
+    
+    for pattern in hash_patterns:
+        hash_match = re.search(pattern, sui_output, re.IGNORECASE)
+        if hash_match:
+            hash_value = hash_match.group(1) if hash_match.lastindex else hash_match.group(0)
+            if hash_value.startswith("0x") and len(hash_value) == 66:
+                logger.debug(f"Transaction hash extracted with regex: {hash_value}")
+                return hash_value
+    
+    logger.warning(f"Could not extract transaction hash from output: {sui_output[:200]}...")
     return None
 
 def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) -> str:
@@ -64,6 +153,18 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
     from core.database import DBConnect
     from core.models import TokenSupply
     from datetime import datetime
+    
+    # 입력 검증
+    if not recipient_address or not recipient_address.startswith("0x"):
+        raise ValueError(f"Invalid recipient address format: {recipient_address}")
+    
+    if amount <= 0:
+        raise ValueError(f"Amount must be positive: {amount}")
+    
+    required_keys = ["package_id", "treasury_cap_id"]
+    for key in required_keys:
+        if key not in sui_config:
+            raise ValueError(f"Missing required SUI configuration key: {key}")
     
     # 발행량 제한 체크
     db_connect = DBConnect()
@@ -89,14 +190,14 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
             remaining = supply_record.remaining_supply
             error_msg = f"토큰 발행 한도 초과: 요청량 {amount}, 남은 발행가능량 {remaining}, 최대공급량 {supply_record.max_supply}"
             logger.error(error_msg)
-            raise Exception(error_msg)
+            raise SuiInteractionError(error_msg)
         
         # 실제 토큰 민팅 실행
         logger.info(f"Attempting to award {amount} SUIBOARD tokens to {recipient_address}")
         
         # SUI CLI 명령 실행
         command = [
-            sui_config.get("sui_bin_path", "sui"),
+            sui_config.get("sui_bin_path", DEFAULT_SUI_BIN_PATH),
             "client", "call",
             "--package", sui_config["package_id"],
             "--module", "suiboard_token",
@@ -105,10 +206,26 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
             sui_config["treasury_cap_id"],
             str(amount),
             recipient_address,
-            "--gas-budget", str(sui_config.get("gas_budget", 100000000))
+            "--gas-budget", str(sui_config.get("gas_budget", DEFAULT_GAS_BUDGET)),
+            "--json"
         ]
         
+        command_str = " ".join(command)
+        logger.info(f"SUI CLI 명령 실행: {command_str}")
         result = subprocess.run(command, capture_output=True, text=True, check=True)
+        logger.info(f"SUI CLI 명령 결과 - stdout: {result.stdout}")
+        if result.stderr:
+            logger.warning(f"SUI CLI 명령 stderr: {result.stderr}")
+        
+        # JSON 응답 파싱
+        try:
+            response_json = json.loads(result.stdout)
+            if "error" in response_json:
+                error_message = response_json.get("error", "Unknown SUI error")
+                logger.error(f"SUI CLI call failed with error: {error_message}")
+                raise SuiInteractionError(f"SUI CLI call failed: {error_message}")
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse JSON response, attempting text parsing")
         
         # 트랜잭션 해시 추출
         tx_hash = extract_transaction_hash(result.stdout)
@@ -117,7 +234,7 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
             # 발행량 업데이트
             supply_record.total_minted += amount
             supply_record.last_updated = datetime.now()
-            supply_record.notes = f"Minted {amount} tokens to {recipient_address}"
+            supply_record.notes = f"Minted {amount} tokens to {recipient_address}, TX: {tx_hash}"
             db.commit()
             
             logger.info(f"SUIBOARD 토큰 {amount}개 발행 완료: {recipient_address}, TX: {tx_hash}")
@@ -126,20 +243,28 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
         else:
             error_msg = f"트랜잭션 해시를 찾을 수 없음: {result.stdout}"
             logger.error(error_msg)
-            raise Exception(error_msg)
+            raise SuiInteractionError(error_msg)
             
     except subprocess.CalledProcessError as e:
-        error_msg = f"SUI CLI 명령 실패: {e.stderr}"
+        error_msg = f"SUI CLI 명령 실패 (RC: {e.returncode}): {e.stderr if e.stderr else e.stdout}"
         logger.error(error_msg)
-        raise Exception(error_msg)
-    except Exception as e:
-        logger.error(f"토큰 지급 실패: {str(e)}")
+        raise SuiInteractionError(error_msg)
+    except SuiInteractionError:
         raise
+    except Exception as e:
+        logger.error(f"토큰 지급 중 예상치 못한 오류: {str(e)}")
+        raise SuiInteractionError(f"토큰 지급 실패: {str(e)}")
     finally:
         db.close()
 
 def reclaim_suiboard_token(amount_to_reclaim: int, sui_config: dict) -> str:
+    """토큰을 회수합니다 (민트 후 즉시 소각)."""
     logger.info(f"Attempting to reclaim (mint and burn) {amount_to_reclaim} Suiboard tokens.")
+    
+    # 입력 검증
+    if amount_to_reclaim <= 0:
+        raise ValueError(f"Amount to reclaim must be positive: {amount_to_reclaim}")
+    
     required_keys = ["package_id", "treasury_cap_id"]
     for key in required_keys:
         if key not in sui_config:
@@ -266,21 +391,38 @@ def reclaim_suiboard_token(amount_to_reclaim: int, sui_config: dict) -> str:
         raise SuiInteractionError(f"An unexpected error occurred during token burn: {e}")
 
 if __name__ == '__main__':
-    print("This is a placeholder for direct testing of the sui_service module.")
+    print("SUI Service Module - Direct Testing")
+    print(f"Default SUI binary path: {DEFAULT_SUI_BIN_PATH}")
+    
+    # Test SUI CLI availability
+    try:
+        active_address = _get_active_sui_address(DEFAULT_SUI_BIN_PATH)
+        print(f"Active SUI address: {active_address}")
+        print("SUI CLI is available and working!")
+    except Exception as e:
+        print(f"SUI CLI test failed: {e}")
+    
+    # Example configuration for testing
+    print("\nExample configuration:")
+    print(f"DEFAULT_SUI_CONFIG = {DEFAULT_SUI_CONFIG}")
+    
+    # Example for testing award_suiboard_token (requires setup):
+    # try:
+    #     test_config = DEFAULT_SUI_CONFIG.copy()
+    #     test_recipient = "0x1234567890abcdef1234567890abcdef12345678"  # Replace with valid address
+    #     test_amount = 100
+    #     tx_hash = award_suiboard_token(test_recipient, test_amount, test_config)
+    #     print(f"Test award transaction hash: {tx_hash}")
+    # except Exception as e:
+    #     print(f"Test award failed: {e}")
+    
     # Example for testing reclaim_suiboard_token (requires setup):
     # try:
-    #     test_reclaim_config = {
-    #         "package_id": "0xYOUR_PACKAGE_ID", # Replace
-    #         "treasury_cap_id": "0xYOUR_TREASURY_CAP_ID", # Replace
-    #         "sui_bin_path": "/home/ubuntu/sui_bin/sui", # Ensure this is correct
-    #         "network": "testnet",
-    #         "gas_budget": 30000000 # Higher budget for two transactions
-    #     }
-    #     amount_to_reclaim_test = 50 # Example amount
-    #     reclaim_digest = reclaim_suiboard_token(amount_to_reclaim_test, test_reclaim_config)
+    #     test_config = DEFAULT_SUI_CONFIG.copy()
+    #     test_config["gas_budget"] = 30000000  # Higher budget for two transactions
+    #     amount_to_reclaim_test = 50
+    #     reclaim_digest = reclaim_suiboard_token(amount_to_reclaim_test, test_config)
     #     print(f"Test reclaim transaction digest: {reclaim_digest}")
-    # except SuiInteractionError as e:
+    # except Exception as e:
     #     print(f"Test reclaim failed: {e}")
-    # except ValueError as e:
-    #     print(f"Configuration error for reclaim: {e}")
 
