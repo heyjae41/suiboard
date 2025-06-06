@@ -86,21 +86,31 @@ class CreatePostService(BoardService):
                         sui_config=DEFAULT_SUI_CONFIG
                     )
                     
-                    # 트랜잭션 로그 저장
+                    # 트랜잭션 로그 저장 (중복 체크)
                     from core.models import SuiTransactionlog
-                    sui_log = SuiTransactionlog(
-                        mb_id=self.member.mb_id,
-                        wr_id=write.wr_id,
-                        bo_table=self.bo_table,
-                        stl_amount=token_amount,
-                        stl_reason="post_creation",
-                        stl_tx_hash=tx_hash,
-                        stl_status="success",
-                        stl_datetime=datetime.now(),
-                        stl_error_message=None
+                    from sqlalchemy import select
+                    
+                    # 동일한 트랜잭션 해시가 이미 존재하는지 확인
+                    existing_log = self.db.scalar(
+                        select(SuiTransactionlog).where(SuiTransactionlog.stl_tx_hash == tx_hash)
                     )
-                    self.db.add(sui_log)
-                    logger.info(f"SUIBOARD 토큰 {token_amount} 지급 완료: {self.member.mb_id}, 게시글 {write.wr_id}, TX: {tx_hash}")
+                    
+                    if not existing_log:
+                        sui_log = SuiTransactionlog(
+                            mb_id=self.member.mb_id,
+                            wr_id=write.wr_id,
+                            bo_table=self.bo_table,
+                            stl_amount=token_amount,
+                            stl_reason="post_creation",
+                            stl_tx_hash=tx_hash,
+                            stl_status="success",
+                            stl_datetime=datetime.now(),
+                            stl_error_message=None
+                        )
+                        self.db.add(sui_log)
+                        logger.info(f"SUIBOARD 토큰 {token_amount} 지급 완료: {self.member.mb_id}, 게시글 {write.wr_id}, TX: {tx_hash}")
+                    else:
+                        logger.warning(f"중복 트랜잭션 해시 발견, 로그 저장 건너뜀: {tx_hash}")
                     
                 except Exception as e:
                     logger.error(f"SUIBOARD 토큰 지급 실패: {self.member.mb_id}, 게시글 {write.wr_id}, 오류: {str(e)}")

@@ -32,6 +32,16 @@ def log_sui_transaction(
         stl_error_message: (Optional) Error message if the transaction failed.
     """
     try:
+        # 중복 트랜잭션 해시 체크 (해시가 있는 경우만)
+        if stl_tx_hash:
+            from sqlalchemy import select
+            existing_log = db.scalar(
+                select(SuiTransactionlog).where(SuiTransactionlog.stl_tx_hash == stl_tx_hash)
+            )
+            if existing_log:
+                logger.warning(f"Duplicate transaction hash found, skipping log: {stl_tx_hash}")
+                return
+        
         log_entry = SuiTransactionlog(
             mb_id=mb_id,
             wr_id=wr_id,

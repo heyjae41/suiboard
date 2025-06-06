@@ -66,20 +66,28 @@ class SuiTokenService:
         if sui_transfer_successful:
             print(f"SuiTokenService: SUI token transfer successful. TxHash: {tx_hash}")
             try:
-                new_token_log = SuiTransactionlog(
-                    mb_id=member.mb_id,
-                    wr_id=None,  # No post associated with login bonus
-                    bo_table=None,  # No board associated with login bonus
-                    stl_amount=amount,
-                    stl_reason="daily_login",
-                    stl_tx_hash=tx_hash,
-                    stl_status="success",
-                    stl_datetime=datetime.datetime.now(),
-                    stl_error_message=None
+                # 중복 트랜잭션 해시 체크
+                existing_log = self.db.scalar(
+                    select(SuiTransactionlog).where(SuiTransactionlog.stl_tx_hash == tx_hash)
                 )
-                self.db.add(new_token_log)
-                self.db.commit()
-                print(f"SuiTokenService: Logged token award for {member.mb_id}.")
+                
+                if not existing_log:
+                    new_token_log = SuiTransactionlog(
+                        mb_id=member.mb_id,
+                        wr_id=None,  # No post associated with login bonus
+                        bo_table=None,  # No board associated with login bonus
+                        stl_amount=amount,
+                        stl_reason="daily_login",
+                        stl_tx_hash=tx_hash,
+                        stl_status="success",
+                        stl_datetime=datetime.datetime.now(),
+                        stl_error_message=None
+                    )
+                    self.db.add(new_token_log)
+                    self.db.commit()
+                    print(f"SuiTokenService: Logged token award for {member.mb_id}.")
+                else:
+                    print(f"SuiTokenService: Duplicate transaction hash found, skipping log: {tx_hash}")
                 return True
             except Exception as e:
                 self.db.rollback()
