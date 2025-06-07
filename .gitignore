@@ -27,7 +27,8 @@ uvicorn.log
 log/
 *.log
 .github/
-
+insider_session.session
+insider_session.session-journal
 # SUI build directories
 suiboard_token/build/
 suiboard_storage/build/
