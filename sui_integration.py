@@ -21,7 +21,11 @@ import os
 import platform
 
 # 배포된 패키지 및 객체 ID 상수 (실제 ID로 대체해야 함)
-SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"  # SUI 바이너리 실행 파일 경로
+# SUI 바이너리 실행 파일 경로 (OS별로 설정)
+if platform.system() == 'Windows':
+    SUI_BIN_PATH = "sui"  # Windows에서는 PATH에서 찾도록 설정
+else:
+    SUI_BIN_PATH = "/home/linuxbrew/.linuxbrew/bin/sui"  # Linux용 경로
 TOKEN_PACKAGE_ID = "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165"  # 토큰 컨트랙트 패키지 ID (2023-05-10 업데이트)
 TOKEN_TREASURY_CAP_ID = "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59"  # 토큰 관리 권한 객체 ID (2023-05-10 업데이트)
 STORAGE_PACKAGE_ID = "0x1fad2576bf6359f0fafc8c089723c80fed4784f5e3ee508b037c5280f91e543f"  # 스토리지 컨트랙트 패키지 ID (2023-05-10 업데이트)
@@ -43,14 +47,20 @@ def _run_sui_command(command_args):
         Exception: 명령어 실행 중 오류 발생 시
     """
     env = os.environ.copy()
-    env["PATH"] = f"{SUI_BIN_PATH}:{env.get('PATH', '')}"  # PATH에 SUI 바이너리 경로 추가
+    # Windows에서는 PATH 설정을 다르게 처리
+    if platform.system() == 'Windows':
+        # Windows에서는 sui.exe가 PATH에 있어야 함
+        pass  # 환경 변수 수정 불필요
+    else:
+        env["PATH"] = f"{SUI_BIN_PATH}:{env.get('PATH', '')}"  # Linux에서 PATH에 SUI 바이너리 경로 추가
     
     try:
         print(f"Running SUI command: sui {' '.join(command_args)}")
         
-        # Windows 환경에서 인코딩 문제를 방지하기 위해 encoding 파라미터 추가
+        # Windows 환경에서 명령어를 문자열로 실행
         if platform.system() == 'Windows':
-            result = subprocess.run(["sui"] + command_args, capture_output=True, text=True, check=True, env=env, encoding='utf-8')
+            command_str = "sui " + " ".join(command_args)
+            result = subprocess.run(command_str, capture_output=True, text=True, check=True, env=env, encoding='utf-8', shell=True)
         else:
             result = subprocess.run(["sui"] + command_args, capture_output=True, text=True, check=True, env=env)
             

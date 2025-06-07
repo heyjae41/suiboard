@@ -4,6 +4,7 @@ import logging # Added for logging SUI interactions
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import platform
 
 from core.models import Member, Board, Config, Point # Assuming Config might hold SUI settings
 from lib.board_lib import insert_board_new, get_next_num, generate_reply_character
@@ -17,6 +18,11 @@ from service.sui_transaction_log_service import log_sui_transaction
 # Configure logger for this module
 logger = logging.getLogger(__name__)
 
+# OS에 따라 SUI 바이너리 경로 설정
+sui_bin_path = "sui"  # 기본값. Windows에서는 PATH에 sui.exe가 있어야 함
+if platform.system() != "Windows":
+    sui_bin_path = "/home/linuxbrew/.linuxbrew/bin/sui"
+
 # Placeholder for SUI configuration - THIS SHOULD BE LOADED FROM A SECURE CONFIG FILE OR ENV VARS
 # Example: These would be specific to your SUI deployment (Testnet/Mainnet)
 DEFAULT_SUI_CONFIG = {
@@ -24,7 +30,7 @@ DEFAULT_SUI_CONFIG = {
     "package_id": "0x7ded54267def06202efa3e9ffb8df024d03b43f9741a9348332eee2ed63ef165", # Replace with actual Package ID
     "treasury_cap_id": "0x3fe97fd206b14a8fc560aeb926eebc36afd68687fbece8df50f8de1012b28e59", # Replace with actual Treasury Cap ID
     "gas_budget": 100000000, # Adjust as needed
-    "sui_bin_path": "/home/linuxbrew/.linuxbrew/bin/sui" # Default path, ensure it's correct
+    "sui_bin_path": sui_bin_path # Default path, ensure it's correct
 }
 TOKEN_AWARD_AMOUNT_POST_CREATION = 200 # Example: 200 smallest units (2.00 tokens with 2 decimals)
 

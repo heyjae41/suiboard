@@ -2,13 +2,17 @@ from telethon.sync import TelegramClient
 from telethon.tl.functions.messages import GetDialogsRequest
 from telethon.tl.types import InputPeerEmpty
 import csv
-import datetime
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 from telethon.errors import SessionPasswordNeededError
 import schedule
 import time
-from board_rest_api import post_to_board
+import sys
+
+# Add project root to sys.path to allow importing project modules
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(PROJECT_ROOT)
 
 # 환경 변수 로드
 load_dotenv()
@@ -18,9 +22,22 @@ api_id = os.getenv("TELEGRAM_API_ID")
 api_hash = os.getenv("TELEGRAM_API_HASH")
 phone = os.getenv("TELEGRAM_PHONE")
 
-# 채널 정보 https://t.me/insidertracking
-CHANNEL_USERNAME = "insidertracking"
+# Configuration
+CHANNEL_USERNAME = "insidertracking"# 채널 정보 https://t.me/insidertracking
+BOARD_TABLE_NAME = "stock"  # Target board table (bo_table)
+AGENT_MEMBER_ID = "AINewsAgent" # Member ID for the agent
+AGENT_MEMBER_NICKNAME = "AINewsAgent"
+
 last_processed_message_id = None
+
+# --- Database Setup --- #
+def get_db():
+    from core.database import db_connect
+    db = db_connect.sessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def get_telegram_client():
@@ -76,19 +93,33 @@ def process_message(message):
                     content += f"\n파일명: {doc.file_name}"
 
         # 게시판에 포스팅할 데이터 구성
-        article_data = {
-            "title": f"미국 주식 트래킹 ({message.date.strftime('%Y-%m-%d %H:%M')})",
-            "content": content,
-            "ca_name": "stock",
-        }
-        # print(article_data)
-        # 게시판에 포스팅
-        if post_to_board(article_data):
-            print(f"게시글 작성 성공: {article_data['title']}")
+        article_title = f"미국 주식 트래킹 ({message.date.strftime('%Y-%m-%d %H:%M')})"
+        
+        # rss_coindesk_agent.py와 동일한 구조로 create_post_by_agent 사용
+        try:
+            from core.database import db_connect
+            from service.agent_service import create_post_by_agent
+            
+            db_session_gen = get_db()
+            db = next(db_session_gen)
+            
+            new_post = create_post_by_agent(
+                db=db,
+                bo_table=BOARD_TABLE_NAME,
+                mb_id=AGENT_MEMBER_ID,
+                wr_subject=article_title,
+                wr_content=content,
+                wr_link1="",  # 텔레그램 메시지는 링크가 없음
+                wr_name=AGENT_MEMBER_NICKNAME,
+                wr_ip="127.0.0.1"  # Placeholder IP for agent
+            )
+            print(f"게시글 작성 성공 - ID: {new_post.wr_id}, 제목: {new_post.wr_subject}")
+            db.close()
             time.sleep(60)  # 1분 대기
             return True
-        else:
-            print(f"게시글 작성 실패: {article_data['title']}")
+            
+        except Exception as e:
+            print(f"게시글 작성 실패 '{article_title}': {e}")
             return False
 
     except Exception as e:

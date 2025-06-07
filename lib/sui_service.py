@@ -103,49 +103,43 @@ def _get_active_sui_address(sui_bin_path: str) -> str:
         raise SuiInteractionError(f"Unexpected error getting active SUI address: {e}")
 
 def extract_transaction_hash(sui_output: str) -> str:
-    """SUI CLI 출력에서 트랜잭션 해시를 추출합니다"""
+    """SUI CLI 출력에서 트랜잭션 해시를 더 정확하게 추출합니다."""
     if not sui_output:
-        logger.warning("Empty SUI output provided for hash extraction")
+        logger.warning("해시를 추출할 SUI 출력이 없습니다.")
         return None
         
     try:
-        # JSON 파싱 시도
+        # 1. JSON 파싱 시도
         output_json = json.loads(sui_output)
         
-        # 다양한 JSON 구조에서 해시 찾기
-        hash_locations = [
-            output_json.get("digest"),
-            output_json.get("effects", {}).get("transactionDigest"),
-            output_json.get("transactionDigest"),
-            output_json.get("result", {}).get("digest")
-        ]
-        
-        for hash_value in hash_locations:
-            if hash_value and isinstance(hash_value, str) and hash_value.startswith("0x") and len(hash_value) == 66:
-                logger.debug(f"Transaction hash extracted from JSON: {hash_value}")
-                return hash_value
-                
+        # 2. 가장 정확한 위치에서 'digest' 찾기
+        # 우선순위: effects.transactionDigest > digest
+        digest = output_json.get("effects", {}).get("transactionDigest")
+        if not digest:
+            digest = output_json.get("digest")
+
+        if digest and isinstance(digest, str) and digest.startswith("0x"):
+             # Heuristic check for a valid-looking digest length
+             # Sui Digests are Base58 encoded and typically 32-44 chars, but TxN Hashes are different. Let's use a reasonable length check.
+            if 32 <= len(digest) <= 66: # A bit lenient
+                logger.info(f"JSON에서 트랜잭션 다이제스트 추출 성공: {digest}")
+                return digest
+            else:
+                logger.warning(f"JSON에서 찾았지만 길이가 의심스러운 다이제스트: {digest}")
+
     except json.JSONDecodeError:
-        logger.debug("JSON parsing failed, attempting regex extraction")
+        logger.debug("JSON 파싱 실패, 정규식으로 추출 시도")
     except Exception as e:
-        logger.warning(f"Unexpected error during JSON parsing: {e}")
+        logger.warning(f"JSON 파싱 중 예외 발생: {e}")
     
-    # JSON 파싱 실패 시 정규식으로 해시 추출
-    hash_patterns = [
-        r'Transaction Digest:\s*(0x[a-fA-F0-9]{64})',
-        r'digest["\']?\s*:\s*["\']?(0x[a-fA-F0-9]{64})',
-        r'(0x[a-fA-F0-9]{64})'  # 일반적인 해시 패턴
-    ]
+    # 3. JSON 파싱 실패 시, 정규식으로 'Transaction Digest' 필드 찾기
+    match = re.search(r"Transaction Digest\s*:\s*(0x[a-fA-F0-9]+)", sui_output)
+    if match:
+        digest = match.group(1)
+        logger.info(f"정규식으로 트랜잭션 다이제스트 추출 성공: {digest}")
+        return digest
     
-    for pattern in hash_patterns:
-        hash_match = re.search(pattern, sui_output, re.IGNORECASE)
-        if hash_match:
-            hash_value = hash_match.group(1) if hash_match.lastindex else hash_match.group(0)
-            if hash_value.startswith("0x") and len(hash_value) == 66:
-                logger.debug(f"Transaction hash extracted with regex: {hash_value}")
-                return hash_value
-    
-    logger.warning(f"Could not extract transaction hash from output: {sui_output[:200]}...")
+    logger.error(f"출력에서 트랜잭션 해시를 추출할 수 없습니다: {sui_output[:300]}...")
     return None
 
 def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) -> str:
@@ -212,7 +206,11 @@ def award_suiboard_token(recipient_address: str, amount: int, sui_config: dict) 
         
         command_str = " ".join(command)
         logger.info(f"SUI CLI 명령 실행: {command_str}")
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
+
+        # Windows에서는 shell=True 옵션을 사용해야 PATH에서 sui.exe를 찾을 수 있음
+        use_shell = platform.system() == "Windows"
+        result = subprocess.run(command, capture_output=True, text=True, check=True, shell=use_shell)
+
         logger.info(f"SUI CLI 명령 결과 - stdout: {result.stdout}")
         if result.stderr:
             logger.warning(f"SUI CLI 명령 stderr: {result.stderr}")
