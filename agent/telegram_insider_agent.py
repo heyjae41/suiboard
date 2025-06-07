@@ -2,7 +2,7 @@ from telethon.sync import TelegramClient
 from telethon.tl.functions.messages import GetDialogsRequest
 from telethon.tl.types import InputPeerEmpty
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 from telethon.errors import SessionPasswordNeededError
@@ -92,8 +92,11 @@ def process_message(message):
                 if hasattr(doc, "file_name"):
                     content += f"\n파일명: {doc.file_name}"
 
+        # 시간 변환 (UTC -> KST)
+        kst_time = message.date + timedelta(hours=9)
+        
         # 게시판에 포스팅할 데이터 구성
-        article_title = f"미국 주식 트래킹 ({message.date.strftime('%Y-%m-%d %H:%M')})"
+        article_title = f"미국 주식 트래킹 ({kst_time.strftime('%Y-%m-%d %H:%M')})"
         
         # rss_coindesk_agent.py와 동일한 구조로 create_post_by_agent 사용
         try:
