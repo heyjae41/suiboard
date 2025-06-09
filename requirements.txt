@@ -9,7 +9,8 @@ pydantic_core==2.33.2
 
 # 데이터베이스 관련
 SQLAlchemy==2.0.40
-alembic==3.0.4
+alembic>=1.13.1
+
 psycopg2-binary==2.9.10
 PyMySQL==1.1.1
 
